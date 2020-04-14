@@ -51,7 +51,7 @@ spec:
             import os, json
             from qepsi4 import run_psi4
             from qeopenfermion import save_interaction_operator
-            from zquantum.core import SCHEMA_VERSION
+            from zquantum.core.utils import SCHEMA_VERSION
 
             with open('geometry.json') as f:
               geometry = json.load(f)
