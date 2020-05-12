@@ -37,5 +37,4 @@ Once that is done you can:
 
 ## Development and Contribution
 
-- If you'd like to report a bug/issue please create a new issue in this repository.
-- If you'd like to contribute, please create a pull request.
+You can find the development guidelines in the [`z-quantum-core` repository](https://github.com/zapatacomputing/z-quantum-core).
