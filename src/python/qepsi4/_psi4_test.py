@@ -54,6 +54,10 @@ def test_run_psi4_using_n_occupied_extract():
 
     assert hamiltonian.n_qubits == 8
 
+    qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
+    energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 4)
+    assert math.isclose(energy, -14.654620243980217)
+
 def test_run_psi4_n_occupied_extract_inconsistent_with_n_active_extract():
     try:
         run_psi4(
