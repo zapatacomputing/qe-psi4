@@ -44,15 +44,15 @@ def test_run_psi4():
 
 def test_run_psi4_using_n_occupied_extract():
     results, hamiltonian = run_psi4(
-        hydrogen_geometry,
+        dilithium_geometry,
         method="scf",
-        basis="6-31G",
-        n_active_extract=2,
-        n_occupied_extract=1,
+        basis="STO-3G",
+        n_active_extract=4,
+        n_occupied_extract=2,
         save_hamiltonian=True
     )
 
-    assert hamiltonian.n_qubits == 4
+    assert hamiltonian.n_qubits == 8
 
 def test_run_psi4_n_occupied_extract_inconsistent_with_n_active_extract():
     try:
@@ -72,9 +72,9 @@ def test_run_psi4_n_occupied_extract_inconsistent_with_n_active_extract():
 def test_run_psi4_n_occupied_extract_inconsistent_with_num_electrons():
     try:
         run_psi4(
-            dilithium_geometry,
+            hydrogen_geometry,
             method="scf",
-            basis="STO-3G",
+            basis="6-31G",
             n_active_extract=4,
             n_occupied_extract=2,
             save_hamiltonian=True

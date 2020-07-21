@@ -3,7 +3,6 @@ import numpy as np
 from openfermion import InteractionOperator, general_basis_change, MolecularData
 from openfermion.config import EQ_TOLERANCE
 
-
 def run_psi4(
     geometry,
     basis="STO-3G",
@@ -83,7 +82,13 @@ def run_psi4(
         if n_active_extract is not None:
             orbitals = wavefunction.Ca().to_array(dense=True)
             n_orbitals = n_active_extract
-            if freeze_core_extract:
+            if n_occupied_extract is not None:
+                if wavefunction.nalpha() != wavefunction.nbeta():
+                    raise ValueError(f'Requesting a number of occupied molecular orbitals not supported when number of alpha and beta electrons is unequal.')
+                if n_occupied_extract > wavefunction.nalpha():
+                    raise ValueError(f'Number of occupied molecular orbitals to extract ({n_occupied_extract}) is larger than number of occupied molecular orbitals ({wavefunction.nalpha()}).')
+                n_orbitals += wavefunction.nalpha() - n_occupied_extract
+            elif freeze_core_extract:
                 n_orbitals += wavefunction.nfrzc()
             orbitals = orbitals[:, :n_orbitals]
             orbitals = psi4.core.Matrix.from_array(orbitals)
