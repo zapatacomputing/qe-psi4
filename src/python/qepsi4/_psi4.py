@@ -90,12 +90,14 @@ def run_psi4(
         hamiltonian = get_ham_from_psi4(
             wavefunction,
             mints,
-            n_active_extract,
-            freeze_core_extract,
-            orbitals,
-            molecule.nuclear_repulsion_energy(),
+            n_active_extract=n_active_extract,
+            n_occupied_extract=n_occupied_extract,
+            freeze_core_extract=freeze_core_extract,
+            orbs=orbitals,
+            nuclear_repulsion_energy=molecule.nuclear_repulsion_energy(),
         )
-
+    
+    psi4.core.clean()
     return results, hamiltonian
 
 
@@ -153,9 +155,9 @@ def get_ham_from_psi4(
     # Build the transformation matrices, i.e. the orbitals for which
     # we want the integrals, as Psi4.core.Matrix objects
     n_core_extract = 0
-    if freeze_core_extract and not n_occupied_extract:
+    if freeze_core_extract and not n_occupied_extract is None:
         n_core_extract = wfn.nfrzc()
-    else:
+    elif n_occupied_extract is not None:
         if wfn.nalpha() != wfn.nbeta():
             raise ValueError(f'Requesting a number of occupied molecular orbitals not supported when number of alpha and beta electrons is unequal.')
         if n_occupied_extract > wfn.nalpha():

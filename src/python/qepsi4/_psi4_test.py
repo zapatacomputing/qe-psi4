@@ -39,7 +39,7 @@ def test_run_psi4():
     results_cisd, hamiltonian = run_psi4(hydrogen_geometry, method="ccsd")
 
     # For this system, the CCSD energy should be exact.
-    assert math.isclose(energy, results_cisd["energy"])
+    assert math.isclose(energy, results_cisd["energy"], rel_tol=1e-7)
 
 
 def test_run_psi4_using_n_occupied_extract():
@@ -62,7 +62,7 @@ def test_run_psi4_n_occupied_extract_inconsistent_with_n_active_extract():
             basis="STO-3G",
             n_active_extract=2,
             n_occupied_extract=3,
-        save_hamiltonian=True
+            save_hamiltonian=True
         )
     except ValueError:
         pass
@@ -77,7 +77,7 @@ def test_run_psi4_n_occupied_extract_inconsistent_with_num_electrons():
             basis="STO-3G",
             n_active_extract=4,
             n_occupied_extract=2,
-        save_hamiltonian=True
+            save_hamiltonian=True
         )
     except ValueError:
         pass
