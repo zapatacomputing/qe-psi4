@@ -16,6 +16,7 @@ def run_psi4(
     save_hamiltonian=False,
     options=None,
     n_active_extract=None,
+    n_occupied_extract=None,
     freeze_core_extract=False,
 ):
     """Generate an input file in the Psi4 python domain-specific language for
@@ -34,15 +35,22 @@ def run_psi4(
         options (dict): additional commands to be passed to Psi4
         n_active_extract (int): number of molecular orbitals to include in the
             saved Hamiltonian. If None, includes all orbitals.
+        n_occupied_extract (int): number of occupied molecular orbitals to
+            include in the saved Hamiltonian. Must be less than or equal to
+            n_active_extract. If None, all occupied orbitals are included,
+            except the core orbitals if freeze_core_extract is set to True.
         freeze_core_extract (bool): whether to freeze core orbitals as doubly
-            occupied in the saved Hamiltonian. When saving UCCSD/MP2 amplitudes, use this option
-            to freeze amplitudes. It will only work as expected if freeze_core is False and the 
-            wavefunction does not have frozen cores from another source
+            occupied in the saved Hamiltonian. Ignored if n_occupied_extract is
+            provided
         
     Returns:
         tuple: The results of the calculation (dict) and the Hamiltonian
             (openfermion.InteractionOperator).
     """
+
+    if n_active_extract is not None and n_occupied_extract is not None:
+        if n_occupied_extract > n_active_extract:
+            raise ValueError(f'Number of occupied molecular orbitals to extract ({n_occupied_extract}) is smaller than total number of molecular orbitals to extract ({n_active_extract}).')
 
     geometry_str = f"{charge} {multiplicity}\n"
     for atom in geometry["sites"]:
@@ -95,6 +103,7 @@ def get_ham_from_psi4(
     wfn,
     mints,
     n_active_extract=None,
+    n_occupied_extract=None,
     freeze_core_extract=False,
     orbs=None,
     nuclear_repulsion_energy=0,
@@ -107,8 +116,13 @@ def get_ham_from_psi4(
         n_active_extract (int): number of molecular orbitals to include in the
             saved Hamiltonian. If None, includes all orbitals, else you must provide
             active orbitals in orbs.
+        n_occupied_extract (int): number of occupied molecular orbitals to
+            include in the saved Hamiltonian. Must be less than or equal to
+            n_active_extract. If None, all occupied orbitals are included,
+            except the core orbitals if freeze_core_extract is set to True.
         freeze_core_extract (bool): whether to freeze core orbitals as doubly
-            occupied in the saved Hamiltonian.
+            occupied in the saved Hamiltonian. Ignored if n_occupied_extract is
+            provided.
         orbs (psi4.core.Matrix): Psi4 orbitals for active space transformations. Must
             include all occupied (also core in all cases).
         nuclear_repulsion_energy (float): The ion-ion interaction energy.
@@ -139,8 +153,16 @@ def get_ham_from_psi4(
     # Build the transformation matrices, i.e. the orbitals for which
     # we want the integrals, as Psi4.core.Matrix objects
     n_core_extract = 0
-    if freeze_core_extract:
+    if freeze_core_extract and not n_occupied_extract:
         n_core_extract = wfn.nfrzc()
+    else:
+        if wfn.nalpha() != wfn.nbeta():
+            raise ValueError(f'Requesting a number of occupied molecular orbitals not supported when number of alpha and beta electrons is unequal.')
+        if n_occupied_extract > wfn.nalpha():
+            raise ValueError(f'Number of occupied molecular orbitals to extract ({n_occupied_extract}) is larger than number of occupied molecular orbitals ({wfn.nalpha()}).')
+
+        n_core_extract = wfn.nalpha() - n_occupied_extract
+
     if n_active_extract is None:
         trf_mat = wfn.Ca()
         n_active_extract = wfn.nmo() - n_core_extract
