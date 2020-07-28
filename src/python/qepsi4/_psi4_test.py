@@ -87,3 +87,15 @@ def test_run_psi4_n_occupied_extract_inconsistent_with_num_electrons():
         pass
     else:
         assert False
+
+def test_run_psi4_freeze_core_extract():
+    results, hamiltonian = run_psi4(
+            dilithium_geometry,
+            method="scf",
+            basis="STO-3G",
+            freeze_core=True,
+            freeze_core_extract=True,
+            save_hamiltonian=True
+        )
+
+    assert hamiltonian.n_qubits == 2*2*(1 + 3)
