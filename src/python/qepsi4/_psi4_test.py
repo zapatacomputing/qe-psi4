@@ -6,6 +6,7 @@ from openfermion import (
 )
 import numpy as np
 import math
+import psi4
 
 hydrogen_geometry = {
     "sites": [
@@ -49,7 +50,7 @@ def test_run_psi4_using_n_occupied_extract():
         basis="STO-3G",
         n_active_extract=4,
         n_occupied_extract=2,
-        save_hamiltonian=True
+        save_hamiltonian=True,
     )
 
     assert hamiltonian.n_qubits == 8
@@ -57,6 +58,7 @@ def test_run_psi4_using_n_occupied_extract():
     qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
     energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 4)
     assert math.isclose(energy, -14.654620243980217)
+
 
 def test_run_psi4_n_occupied_extract_inconsistent_with_n_active_extract():
     try:
@@ -66,12 +68,13 @@ def test_run_psi4_n_occupied_extract_inconsistent_with_n_active_extract():
             basis="STO-3G",
             n_active_extract=2,
             n_occupied_extract=3,
-            save_hamiltonian=True
+            save_hamiltonian=True,
         )
     except ValueError:
         pass
     else:
         assert False
+
 
 def test_run_psi4_n_occupied_extract_inconsistent_with_num_electrons():
     try:
@@ -81,21 +84,25 @@ def test_run_psi4_n_occupied_extract_inconsistent_with_num_electrons():
             basis="6-31G",
             n_active_extract=4,
             n_occupied_extract=2,
-            save_hamiltonian=True
+            save_hamiltonian=True,
         )
     except ValueError:
         pass
     else:
         assert False
 
-def test_run_psi4_freeze_core_extract():
-    results, hamiltonian = run_psi4(
-            dilithium_geometry,
-            method="scf",
-            basis="STO-3G",
-            freeze_core=True,
-            freeze_core_extract=True,
-            save_hamiltonian=True
-        )
 
-    assert hamiltonian.n_qubits == 2*2*(1 + 3)
+def test_run_psi4_freeze_core_extract():
+    # For some reason, we must clean Psi4 before running this test if other
+    # tests have already run.
+    psi4.core.clean()
+    results, hamiltonian = run_psi4(
+        dilithium_geometry,
+        method="scf",
+        basis="STO-3G",
+        freeze_core=True,
+        freeze_core_extract=True,
+        save_hamiltonian=True,
+    )
+
+    assert hamiltonian.n_qubits == 2 * 2 * (1 + 3)
