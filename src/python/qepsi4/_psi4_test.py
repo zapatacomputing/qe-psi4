@@ -105,4 +105,5 @@ def test_run_psi4_freeze_core_extract():
         save_hamiltonian=True,
     )
 
+    # With STO-3G, each Li atom has one 1s orbital, one 2s orbital, and three 2p orbitals. The 1s orbitals are considered core orbitals.
     assert hamiltonian.n_qubits == 2 * 2 * (1 + 3)
