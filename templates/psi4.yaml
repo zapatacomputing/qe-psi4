@@ -21,6 +21,8 @@ spec:
         default: 'False'
       - name: n-active-extract
         default: None
+      - name: n-occupied-extract
+        default: None
       - name: freeze-core-extract
         default: 'False'
       - name: nthreads
@@ -67,6 +69,7 @@ spec:
                      save_hamiltonian={{inputs.parameters.save-hamiltonian}},
                      options={{inputs.parameters.options}},
                      n_active_extract={{inputs.parameters.n-active-extract}},
+                     n_occupied_extract={{inputs.parameters.n-occupied-extract}},
                      freeze_core_extract={{inputs.parameters.freeze-core-extract}})
             
             results['schema'] = SCHEMA_VERSION + '-energy_calc'
