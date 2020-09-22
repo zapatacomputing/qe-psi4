@@ -4,7 +4,7 @@ from qeopenfermion import save_interaction_operator
 from zquantum.core.utils import SCHEMA_VERSION
 
 
-def run_psi4(
+def run_psi4_task(
     basis,
     method,
     reference,
