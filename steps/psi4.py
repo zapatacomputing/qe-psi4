@@ -1,10 +1,10 @@
 import os, json
-from qepsi4 import run_psi4
+from qepsi4 import run_psi4 as _run_psi4
 from qeopenfermion import save_interaction_operator
 from zquantum.core.utils import SCHEMA_VERSION
 
 
-def run_psi4_step(
+def run_psi4(
     basis,
     method,
     reference,
@@ -27,7 +27,7 @@ def run_psi4_step(
     with open(geometry) as f:
         geometry = json.load(f)
 
-    results, hamiltonian = run_psi4(
+    results, hamiltonian = _run_psi4(
         geometry,
         basis=basis,
         multiplicity=multiplicity,
