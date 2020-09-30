@@ -14,7 +14,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/zapatacomputing/qe-psi4",
     packages=["qepsi4"],
-    package_dir={"": "python"},
+    package_dir={"": "src/python"},
     classifiers=(
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
