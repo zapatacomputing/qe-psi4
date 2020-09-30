@@ -24,6 +24,17 @@ def run_psi4(
     os.mkdir("/app/scr")
     os.environ["PSI_SCRATCH"] = "/app/scr"
 
+    if n_active_extract is "None":
+        n_active_extract = None
+    if n_occupied_extract is "None":
+        n_occupied_extract = None
+    if n_active is "None":
+        n_active = None
+    if options is "None":
+        options = None
+    if wavefunction is "None":
+        wavefunction = None
+
     with open(geometry) as f:
         geometry = json.load(f)
 
@@ -33,7 +44,7 @@ def run_psi4(
         multiplicity=multiplicity,
         charge=charge,
         method=method,
-        reference="reference",
+        reference=reference,
         freeze_core=freeze_core,
         n_active=n_active,
         save_hamiltonian=save_hamiltonian,
