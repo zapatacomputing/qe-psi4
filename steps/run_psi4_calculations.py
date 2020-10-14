@@ -24,15 +24,15 @@ def run_psi4(
     os.mkdir("/app/scr")
     os.environ["PSI_SCRATCH"] = "/app/scr"
 
-    if n_active_extract is "None":
+    if n_active_extract == "None":
         n_active_extract = None
-    if n_occupied_extract is "None":
+    if n_occupied_extract == "None":
         n_occupied_extract = None
-    if n_active is "None":
+    if n_active == "None":
         n_active = None
-    if options is "None":
+    if options == "None":
         options = None
-    if wavefunction is "None":
+    if wavefunction == "None":
         wavefunction = None
 
     with open(geometry) as f:
