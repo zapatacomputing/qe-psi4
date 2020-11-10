@@ -4,6 +4,34 @@ from openfermion import InteractionOperator, general_basis_change, MolecularData
 from openfermion.config import EQ_TOLERANCE
 
 
+def compute_n_core_extract(wfn, n_occupied_extract, freeze_core_extract):
+    """ Helper function to calculate the number of doubly occupied orbitals when extracting Hamiltonian/RDM 
+    Args:
+        n_occupied_extract (int): number of occupied molecular orbitals to
+            include in the saved Hamiltonian. Must be less than or equal to
+            n_active_extract. If None, all occupied orbitals are included,
+            except the core orbitals if freeze_core_extract is set to True.
+        freeze_core_extract (bool): If True, frozen core orbitals will always be
+            doubly occupied in the saved Hamiltonian. Ignored if
+            n_occupied_extract is not None.
+    """
+    n_core_extract = 0
+    if freeze_core_extract and n_occupied_extract is None:
+        n_core_extract = wfn.nfrzc()
+    elif n_occupied_extract is not None: # n_occupied_extract overrides freeze_core_extract=True
+        if wfn.nalpha() != wfn.nbeta():
+            raise ValueError(
+                f"Requesting a number of occupied molecular orbitals not supported when number of alpha and beta electrons is unequal."
+            )
+        if n_occupied_extract > wfn.nalpha():
+            raise ValueError(
+                f"Number of occupied molecular orbitals to extract ({n_occupied_extract}) is larger than number of occupied molecular orbitals ({wfn.nalpha()})."
+            )
+
+        n_core_extract = wfn.nalpha() - n_occupied_extract
+
+    return n_core_extract
+
 def run_psi4(
     geometry,
     basis="STO-3G",
@@ -188,24 +216,10 @@ def get_ham_from_psi4(
 
     # Build the transformation matrices, i.e. the orbitals for which
     # we want the integrals, as Psi4.core.Matrix objects
-    n_core_extract = 0
-    if freeze_core_extract and n_occupied_extract is None:
-        n_core_extract = wfn.nfrzc()
-    elif n_occupied_extract is not None:
-        if wfn.nalpha() != wfn.nbeta():
-            raise ValueError(
-                f"Requesting a number of occupied molecular orbitals not supported when number of alpha and beta electrons is unequal."
-            )
-        if n_occupied_extract > wfn.nalpha():
-            raise ValueError(
-                f"Number of occupied molecular orbitals to extract ({n_occupied_extract}) is larger than number of occupied molecular orbitals ({wfn.nalpha()})."
-            )
-
-        n_core_extract = wfn.nalpha() - n_occupied_extract
-
+    n_core_extract = compute_n_core_extract(wfn, n_occupied_extract, freeze_core_extract)
     if n_active_extract is None:
         trf_mat = wfn.Ca()
-        n_active_extract = wfn.nmo() - n_core_extract # - wfn.nfzvpi.sum() ?
+        n_active_extract = wfn.nmo() - n_core_extract 
     else:
         # If orbs is given, it allows us to perform the two-electron integrals
         # transformation only in the space of active orbitals. Otherwise, we
@@ -253,23 +267,22 @@ def get_ham_from_psi4(
     return hamiltonian
 
 def get_rdms_from_psi4(wfn, 
-    freeze_core,
+    freeze_core=False,
     n_active_extract=None, 
     n_occupied_extract=None,
     freeze_core_extract=False):
     """
     Args:
         wfn (psi4.core.Wavefunction): Psi4 wavefunction object
-        freeze_core (bool): Whether to freeze occupied core orbitals
         n_active_extract (int): number of molecular orbitals to include in the
-            saved Hamiltonian. If None, includes all orbitals, else you must provide
+            saved RDM. If None, includes all orbitals, else you must provide
             active orbitals in orbs.
         n_occupied_extract (int): number of occupied molecular orbitals to
-            include in the saved Hamiltonian. Must be less than or equal to
+            include in the saved RDM. Must be less than or equal to
             n_active_extract. If None, all occupied orbitals are included,
             except the core orbitals if freeze_core_extract is set to True.
         freeze_core_extract (bool): If True, frozen core orbitals will always be
-            doubly occupied in the saved Hamiltonian. Ignored if
+            doubly occupied in the saved RDM. Ignored if
             n_occupied_extract is not None.
     Returns:
         rdm (openfermion.ops.InteractionRDM): an openfermion object storing
@@ -282,25 +295,11 @@ def get_rdms_from_psi4(wfn,
         0, 0, 'B', True)).reshape(wfn.nmo(), wfn.nmo())
 
     # Get 2-RDM from CI calculation.
-    n_core_extract = 0
-    if freeze_core_extract and n_occupied_extract is None:
-        n_core_extract = wfn.nfrzc() # This logic implies that cores are always the lowest energy orbitals.
-    elif n_occupied_extract is not None:
-        if wfn.nalpha() != wfn.nbeta():
-            raise ValueError(
-                f"Requesting a number of occupied molecular orbitals not supported when number of alpha and beta electrons is unequal."
-            )
-        if n_occupied_extract > wfn.nalpha():
-            raise ValueError(
-                f"Number of occupied molecular orbitals to extract ({n_occupied_extract}) is larger than number of occupied molecular orbitals ({wfn.nalpha()})."
-            )
-
-        n_core_extract = wfn.nalpha() - n_occupied_extract
-
+    n_core_extract = compute_n_core_extract(wfn, n_occupied_extract, freeze_core_extract)
     if n_active_extract is None:
         n_active_extract = wfn.nmo() - n_core_extract
     
-    nfnmo = wfn.nmo() - wfn.frzcpi().sum() - wfn.frzvpi().sum() # I wouldn't work otherwise for 2-RDMs
+    nfnmo = wfn.nmo() - wfn.frzcpi().sum() - wfn.frzvpi().sum() 
 
     two_rdm_aa = np.array(wfn.get_tpdm(
         'AA', False)).reshape(nfnmo, nfnmo,
