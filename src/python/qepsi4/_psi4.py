@@ -4,8 +4,6 @@ import numpy as np
 from openfermion import InteractionOperator, general_basis_change, MolecularData, InteractionRDM
 from openfermion.config import EQ_TOLERANCE
 
-#EQ_TOLERANCE = 1e-14
-
 
 def select_active_space(mol, wfn, n_active_extract=None, n_occupied_extract=None, freeze_core_extract=False):
     """ Helper function to calculate the number of doubly occupied, active and virtual orbitals when extracting Hamiltonian/RDM 
@@ -164,7 +162,7 @@ def run_psi4(
     if method == 'fci' or method == 'cis' or method == 'cisd' or method == 'cisdt' or method == 'cisdtq':
         psi4.set_options({'qc_module' : 'detci' })
         if save_rdms:
-            psi4.set_options({'opdm' : True, 'tpdm' : True, 'frozen_docc' : ndocc, 'frozen_uocc' : nvir}) # hopefully, this overrides freeze_core = True
+            psi4.set_options({'opdm' : True, 'tpdm' : True, 'frozen_docc' : ndocc, 'frozen_uocc' : nvir}) # this overrides freeze_core = True
 
     energy, wavefunction = psi4.energy(method, return_wfn=True)
 
@@ -212,9 +210,9 @@ def run_psi4(
 def get_ham_from_psi4(
     wfn,
     mints,
-    orbs,
-    ndocc,
-    nact,
+    orbs=None,
+    ndocc=None,
+    nact=None,
     nuclear_repulsion_energy=0,
 ):
     """Get a molecular Hamiltonian from a Psi4 calculation.
@@ -222,18 +220,12 @@ def get_ham_from_psi4(
     Args:
         wfn (psi4.core.Wavefunction): Psi4 wavefunction object
         mints (psi4.core.MintsHelper): Psi4 molecular integrals helper
-        n_active_extract (int): number of molecular orbitals to include in the
-            saved Hamiltonian. If None, includes all orbitals, else you must provide
-            active orbitals in orbs.
-        n_occupied_extract (int): number of occupied molecular orbitals to
-            include in the saved Hamiltonian. Must be less than or equal to
-            n_active_extract. If None, all occupied orbitals are included,
-            except the core orbitals if freeze_core_extract is set to True.
-        freeze_core_extract (bool): If True, frozen core orbitals will always be
-            doubly occupied in the saved Hamiltonian. Ignored if
-            n_occupied_extract is not None.
         orbs (psi4.core.Matrix): Psi4 orbitals for active space transformations. Must
             include all occupied (also core in all cases).
+        ndocc (int): number of doubly occupied molecular orbitals to
+            include in the saved Hamiltonian. 
+        nact (int): number of active molecular orbitals to include in the
+            saved Hamiltonian. 
         nuclear_repulsion_energy (float): The ion-ion interaction energy.
     
     Returns:
@@ -262,12 +254,20 @@ def get_ham_from_psi4(
     # Build the transformation matrices, i.e. the orbitals for which
     # we want the integrals, as Psi4.core.Matrix objects
     if orbs is not None:
-        assert (
-            orbs.to_array(dense=True).shape[1] == nact + ndocc
-        )
+        if nact is None or ndocc is None:
+            print(f"One of the active space selection parameters (nact, ndocc) is None. ndocc will be reset to 0 and nact will be set to match the size of orbs.")
+            ndocc = 0
+            nact = orbs.to_array(dense=True).shape[1]
+        else:
+            assert (
+                orbs.to_array(dense=True).shape[1] == nact + ndocc
+            )
         trf_mat = orbs
     else:
         trf_mat = wfn.Ca()
+        print(f"orbs parameter is not provided. ndocc will be reset to 0 and nact will be set to match the size of wfn.Ca().")
+        ndocc = 0
+        nact = wfn.Ca().to_array(dense=True).shape[1]
 
     two_body_integrals = np.asarray(mints.mo_eri(trf_mat, trf_mat, trf_mat, trf_mat))
     n_orbitals = trf_mat.shape[1]
@@ -296,25 +296,26 @@ def get_ham_from_psi4(
     return hamiltonian
 
 def get_rdms_from_psi4(wfn, 
-    ndocc, nact):
+    ndocc=None, 
+    nact=None):
 
     """Get 1- and 2-RDMs from a Psi4 calculation.
 
     Args:
         wfn (psi4.core.Wavefunction): Psi4 wavefunction object
-        n_active_extract (int): number of molecular orbitals to include in the
-            saved RDM. If None, includes all orbitals.
-        n_occupied_extract (int): number of occupied molecular orbitals to
-            include in the saved RDM. Must be less than or equal to
-            n_active_extract. If None, all occupied orbitals are included,
-            except the core orbitals if freeze_core_extract is set to True.
-        freeze_core_extract (bool): If True, frozen core orbitals will always be
-            doubly occupied in the saved RDM. Ignored if
-            n_occupied_extract is not None.
+        ndocc (int): number of doubly occupied molecular orbitals to
+            include in the saved RDM. 
+        nact (int): number of active molecular orbitals to include in the
+            saved RDM. 
     Returns:
         rdm (openfermion.ops.InteractionRDM): an openfermion object storing
             1- and 2-RDMs. 
     """
+
+    if nact is None or ndocc is None:
+        print(f"One of the active space selection parameters (nact, ndocc) is None. ndocc will be reset to 0 and nact will be set to match the size wfn.Ca().")
+        ndocc = 0
+        nact = wfn.Ca().to_array(dense=True).shape[1]
 
     one_rdm_a = np.array(wfn.get_opdm(
         0, 0, 'A', True)).reshape(wfn.nmo(), wfn.nmo()) 
