@@ -1,12 +1,20 @@
 import psi4
+from psi4 import qcel as qc # QCelemental (https://github.com/MolSSI/QCElemental)
 import numpy as np
 from openfermion import InteractionOperator, general_basis_change, MolecularData, InteractionRDM
 from openfermion.config import EQ_TOLERANCE
 
+#EQ_TOLERANCE = 1e-14
 
-def compute_n_core_extract(wfn, n_occupied_extract, freeze_core_extract):
-    """ Helper function to calculate the number of doubly occupied orbitals when extracting Hamiltonian/RDM 
+
+def select_active_space(mol, wfn, n_active_extract=None, n_occupied_extract=None, freeze_core_extract=False):
+    """ Helper function to calculate the number of doubly occupied, active and virtual orbitals when extracting Hamiltonian/RDM 
     Args:
+        mol (psi4.core.Molecule): Psi4 object contianing information about the molecule
+            including geometry, charge, symmetry and spin multiplicity
+        wfn (psi4.core.Wavefunction): Psi4 Wavefunction object; contains basis set info
+        n_active_extract (int): number of molecular orbitals to include in the
+            saved Hamiltonian. If None, includes all orbitals.
         n_occupied_extract (int): number of occupied molecular orbitals to
             include in the saved Hamiltonian. Must be less than or equal to
             n_active_extract. If None, all occupied orbitals are included,
@@ -15,9 +23,44 @@ def compute_n_core_extract(wfn, n_occupied_extract, freeze_core_extract):
             doubly occupied in the saved Hamiltonian. Ignored if
             n_occupied_extract is not None.
     """
+    # Check the input parameters (should we add more checks?)
+    if n_active_extract is not None:
+        if wfn.nalpha() != wfn.nbeta():
+            raise ValueError(
+                f"Requesting a number of occupied molecular orbitals not supported when number of alpha and beta electrons is unequal."
+            )
+        if wfn.nmo() < n_active_extract:
+            raise ValueError(
+                f"Number of active orbitals exceeds the number of basis functions."
+            )
+        if n_occupied_extract is not None:
+            if n_occupied_extract > n_active_extract:
+                raise ValueError(
+                    f"Number of occupied molecular orbitals to extract ({n_occupied_extract}) is larger than total number of molecular orbitals to extract ({n_active_extract})."
+                )
+    if n_occupied_extract is not None:
+        if n_occupied_extract > wfn.nalpha():
+            raise ValueError(
+                f"Number of occupied molecular orbitals to extract ({n_occupied_extract}) is larger than number of occupied molecular orbitals ({wfn.nalpha()})."
+            )
+
+    # Determine the number of core orbitals based on the molecular identity
+    # Number of cores for a given row of periodic table 
+    chemical_core_orbitals = { 1 : 0, 2 : qc.periodictable.to_Z('He') // 2, 3 : qc.periodictable.to_Z('Ne') // 2, 4 : qc.periodictable.to_Z('Ar') // 2 }
+
+    nfrzc = 0 # number of orbitals to freeze if freeze_core = True
+    for i in range(mol.natom()):
+        atom = mol.label(i)
+        ncore = chemical_core_orbitals.get(qc.periodictable.to_period(atom), None)
+        if ncore is None:
+            raise ValueError(
+                f"Core definitions were not implemented for the elements beyond the 4th row of periodic table but the molecule contains {atom}."
+            )
+        nfrzc += ncore
+
     n_core_extract = 0
     if freeze_core_extract and n_occupied_extract is None:
-        n_core_extract = wfn.nfrzc()
+        n_core_extract = nfrzc
     elif n_occupied_extract is not None: # n_occupied_extract overrides freeze_core_extract=True
         if wfn.nalpha() != wfn.nbeta():
             raise ValueError(
@@ -30,7 +73,19 @@ def compute_n_core_extract(wfn, n_occupied_extract, freeze_core_extract):
 
         n_core_extract = wfn.nalpha() - n_occupied_extract
 
-    return n_core_extract
+    if n_active_extract is not None:
+        if n_core_extract + n_active_extract > wfn.nmo():
+            raise ValueError(
+                f"Active space dimension ({n_active_extract}) is inconsistent with the number of doubly occupied oribtals ({n_core_extract}) and basis set size ({wfn.nmo()})."
+            )
+        else:
+            n_virtual_extract = wfn.nmo() - n_core_extract - n_active_extract
+    else:
+        n_active_extract = wfn.nmo() - n_core_extract
+        n_virtual_extract = 0
+        assert n_active_extract > 0
+
+    return n_core_extract, n_active_extract, n_virtual_extract
 
 def run_psi4(
     geometry,
@@ -40,7 +95,6 @@ def run_psi4(
     method="scf",
     reference="rhf",
     freeze_core=False,
-    n_active=None,
     save_hamiltonian=False,
     options=None,
     n_active_extract=None,
@@ -59,7 +113,6 @@ def run_psi4(
         method (str): which calculation method to use
         reference (str): which reference wavefunction to use. fno- energy methods are only compatible with RHF
         freeze_core (bool): Whether to freeze occupied core orbitals
-        n_active (int): Number of active orbitals. Freeze virtual orbitals that do not fit on the qubits.
         save_hamiltonian (bool): whether to save the Hamiltonian to a file. If True, symmetry will be disabled.
         options (dict): additional commands to be passed to Psi4
         n_active_extract (int): number of molecular orbitals to include in the
@@ -78,17 +131,12 @@ def run_psi4(
             (openfermion.InteractionOperator).
     """
 
-    if n_active_extract is not None and n_occupied_extract is not None:
-        if n_occupied_extract > n_active_extract:
-            raise ValueError(
-                f"Number of occupied molecular orbitals to extract ({n_occupied_extract}) is larger than total number of molecular orbitals to extract ({n_active_extract})."
-            )
-
     if save_rdms and not method in ['fci', 'cis', 'cisd', 'cisdt', 'cisdtq']:
         print(f"run_psi4 was called with method={method}")
         raise Warning(
             f"RDM calculation can only be performed for Configuration Interaction methods. save_rdms option will be ignored."
         )
+
 
     geometry_str = f"{charge} {multiplicity}\n"
     for atom in geometry["sites"]:
@@ -97,20 +145,33 @@ def run_psi4(
         )
 
     geometry_str += "\nunits angstrom\n"
-    c1_sym = save_hamiltonian or n_active
+    c1_sym = save_hamiltonian # or n_active
     if c1_sym:
         geometry_str += "symmetry c1\n"
 
     molecule = psi4.geometry(geometry_str)
+
     psi4.set_options(
         {"reference": reference, "basis": basis, "freeze_core": freeze_core}
     )
+
+
+    # Create a fake wave function and use it to select the active space based on the input parameters
+    fake_wfn = psi4.core.Wavefunction.build(molecule, psi4.core.get_global_option('basis')) 
+    ndocc, nact, nvir = select_active_space(molecule, fake_wfn, n_active_extract=n_active_extract, \
+            n_occupied_extract=n_occupied_extract, freeze_core_extract=freeze_core_extract)
+
     if method == 'fci' or method == 'cis' or method == 'cisd' or method == 'cisdt' or method == 'cisdtq':
-        psi4.set_options({'qc_module' : 'detci'})
+        psi4.set_options({'qc_module' : 'detci' })
         if save_rdms:
-            psi4.set_options({'opdm' : True, 'tpdm' : True})
+            psi4.set_options({'opdm' : True, 'tpdm' : True, 'frozen_docc' : ndocc, 'frozen_uocc' : nvir}) # hopefully, this overrides freeze_core = True
 
     energy, wavefunction = psi4.energy(method, return_wfn=True)
+
+    # Perform a sanity check to make sure that the active space was selected correctly
+    assert wavefunction.nmo() == (ndocc + nact + nvir)
+    #if method != 'scf':  
+    #    assert wavefunction.fzvpi().sum() == nvir 
 
     results = {
         "energy": energy,
@@ -124,36 +185,20 @@ def run_psi4(
     hamiltonian = None
     if save_hamiltonian:
         mints = psi4.core.MintsHelper(wavefunction.basisset())
-        orbitals = None
-        if n_active_extract is not None:
-            orbitals = wavefunction.Ca().to_array(dense=True)
-            n_orbitals = n_active_extract
-            if n_occupied_extract is not None:
-                if wavefunction.nalpha() != wavefunction.nbeta():
-                    raise ValueError(
-                        f"Requesting a number of occupied molecular orbitals not supported when number of alpha and beta electrons is unequal."
-                    )
-                if n_occupied_extract > wavefunction.nalpha():
-                    raise ValueError(
-                        f"Number of occupied molecular orbitals to extract ({n_occupied_extract}) is larger than number of occupied molecular orbitals ({wavefunction.nalpha()})."
-                    )
-                n_orbitals += wavefunction.nalpha() - n_occupied_extract
-            elif freeze_core_extract:
-                n_orbitals += wavefunction.nfrzc()
-            orbitals = orbitals[:, :n_orbitals]
-            orbitals = psi4.core.Matrix.from_array(orbitals)
+        orbitals = wavefunction.Ca().to_array(dense=True)
+        orbitals = orbitals[:, :ndocc + nact]
+        orbitals = psi4.core.Matrix.from_array(orbitals)
         hamiltonian = get_ham_from_psi4(
             wavefunction,
             mints,
-            n_active_extract=n_active_extract,
-            n_occupied_extract=n_occupied_extract,
-            freeze_core_extract=freeze_core_extract,
             orbs=orbitals,
+            ndocc=ndocc,
+            nact=nact,
             nuclear_repulsion_energy=molecule.nuclear_repulsion_energy(),
         )
 
     if save_rdms:
-        rdm = get_rdms_from_psi4(wavefunction, freeze_core, n_active_extract, n_occupied_extract, freeze_core_extract)
+        rdm = get_rdms_from_psi4(wavefunction, ndocc=ndocc, nact=nact)
         psi4.core.clean()
         psi4.core.clean_options()
         psi4.core.clean_variables()
@@ -167,10 +212,9 @@ def run_psi4(
 def get_ham_from_psi4(
     wfn,
     mints,
-    n_active_extract=None,
-    n_occupied_extract=None,
-    freeze_core_extract=False,
-    orbs=None,
+    orbs,
+    ndocc,
+    nact,
     nuclear_repulsion_energy=0,
 ):
     """Get a molecular Hamiltonian from a Psi4 calculation.
@@ -202,6 +246,7 @@ def get_ham_from_psi4(
         + "with different alpha and beta orbitals not yet supported :("
     )
 
+
     # Note: code refactored to use Psi4 integral-transformation routines
     # no more storing the whole two-electron integral tensor when only an
     # active space is needed
@@ -216,22 +261,13 @@ def get_ham_from_psi4(
 
     # Build the transformation matrices, i.e. the orbitals for which
     # we want the integrals, as Psi4.core.Matrix objects
-    n_core_extract = compute_n_core_extract(wfn, n_occupied_extract, freeze_core_extract)
-    if n_active_extract is None:
-        trf_mat = wfn.Ca()
-        n_active_extract = wfn.nmo() - n_core_extract 
+    if orbs is not None:
+        assert (
+            orbs.to_array(dense=True).shape[1] == nact + ndocc
+        )
+        trf_mat = orbs
     else:
-        # If orbs is given, it allows us to perform the two-electron integrals
-        # transformation only in the space of active orbitals. Otherwise, we
-        # transform all orbitals and filter them out in the get_ham_from_integrals
-        # function
-        if orbs is None: # If n_acitve_extract is not None - how could possibly be orbs == None?
-            trf_mat = wfn.Ca()
-        else:
-            assert (
-                orbs.to_array(dense=True).shape[1] == n_active_extract + n_core_extract
-            )
-            trf_mat = orbs
+        trf_mat = wfn.Ca()
 
     two_body_integrals = np.asarray(mints.mo_eri(trf_mat, trf_mat, trf_mat, trf_mat))
     n_orbitals = trf_mat.shape[1]
@@ -242,15 +278,8 @@ def get_ham_from_psi4(
     one_body_integrals[np.absolute(one_body_integrals) < EQ_TOLERANCE] = 0.0
     two_body_integrals[np.absolute(two_body_integrals) < EQ_TOLERANCE] = 0.0
 
-    if n_active_extract is None and not freeze_core_extract:
-        occupied_indices = None
-        active_indices = None
-    else:
-        # Indices of occupied molecular orbitals
-        occupied_indices = range(n_core_extract)
-
-        # Indices of active molecular orbitals
-        active_indices = range(n_core_extract, n_core_extract + n_active_extract)
+    occupied_indices = range(ndocc)
+    active_indices = range(ndocc, ndocc + nact)
 
     # In order to keep the MolecularData class happy, we need a 'valid' molecule
     molecular_data = MolecularData(
@@ -267,16 +296,14 @@ def get_ham_from_psi4(
     return hamiltonian
 
 def get_rdms_from_psi4(wfn, 
-    freeze_core=False,
-    n_active_extract=None, 
-    n_occupied_extract=None,
-    freeze_core_extract=False):
-    """
+    ndocc, nact):
+
+    """Get 1- and 2-RDMs from a Psi4 calculation.
+
     Args:
         wfn (psi4.core.Wavefunction): Psi4 wavefunction object
         n_active_extract (int): number of molecular orbitals to include in the
-            saved RDM. If None, includes all orbitals, else you must provide
-            active orbitals in orbs.
+            saved RDM. If None, includes all orbitals.
         n_occupied_extract (int): number of occupied molecular orbitals to
             include in the saved RDM. Must be less than or equal to
             n_active_extract. If None, all occupied orbitals are included,
@@ -290,52 +317,28 @@ def get_rdms_from_psi4(wfn,
     """
 
     one_rdm_a = np.array(wfn.get_opdm(
-        0, 0, 'A', True)).reshape(wfn.nmo(), wfn.nmo()) # Note: this works even if freeze_core is True
+        0, 0, 'A', True)).reshape(wfn.nmo(), wfn.nmo()) 
     one_rdm_b = np.array(wfn.get_opdm(
         0, 0, 'B', True)).reshape(wfn.nmo(), wfn.nmo())
 
     # Get 2-RDM from CI calculation.
-    n_core_extract = compute_n_core_extract(wfn, n_occupied_extract, freeze_core_extract)
-    if n_active_extract is None:
-        n_active_extract = wfn.nmo() - n_core_extract
-    
-    nfnmo = wfn.nmo() - wfn.frzcpi().sum() - wfn.frzvpi().sum() 
 
     two_rdm_aa = np.array(wfn.get_tpdm(
-        'AA', False)).reshape(nfnmo, nfnmo,
-                                nfnmo, nfnmo)
+        'AA', False)).reshape(nact, nact,
+                                nact, nact)
     two_rdm_ab = np.array(wfn.get_tpdm(
-        'AB', False)).reshape(nfnmo, nfnmo,
-                                nfnmo, nfnmo)
+        'AB', False)).reshape(nact, nact,
+                                nact, nact)
     two_rdm_bb = np.array(wfn.get_tpdm(
-        'BB', False)).reshape(nfnmo, nfnmo,
-                                nfnmo, nfnmo)
-
-    # Indices of active molecular orbitals
-    active_indices = range(n_core_extract, n_core_extract + n_active_extract)
+        'BB', False)).reshape(nact, nact,
+                                nact, nact)
 
     # adjusting 1-RDM
+    # Indices of active molecular orbitals
+    active_indices = range(ndocc, ndocc + nact)
     one_rdm_a = one_rdm_a[np.ix_(active_indices, active_indices)]
     one_rdm_b = one_rdm_b[np.ix_(active_indices, active_indices)]
-    
-    if freeze_core:
-        active_indices = range(n_active_extract) # Need to double check if this actually works
-    # If one also requested freeze_core_extract => we need to construct and save RHF RDMs for the core
-
-    # adjusting 2-RDM
-    two_rdm_aa = two_rdm_aa[np.ix_(active_indices,
-                                  active_indices,
-                                  active_indices,
-                                  active_indices)]
-    two_rdm_ab = two_rdm_ab[np.ix_(active_indices,
-                                  active_indices,
-                                  active_indices,
-                                  active_indices)]
-    two_rdm_bb = two_rdm_bb[np.ix_(active_indices,
-                                   active_indices,
-                                   active_indices,
-                                   active_indices)]
-
+   
     one_rdm, two_rdm = unpack_spatial_rdm(
     one_rdm_a, one_rdm_b, two_rdm_aa,
     two_rdm_ab, two_rdm_bb)
@@ -350,7 +353,7 @@ def unpack_spatial_rdm(one_rdm_a,
                        two_rdm_ab,
                        two_rdm_bb):
     r"""
-    Covert from spin compact spatial format to spin-orbital format for RDM.
+    Convert from spin compact spatial format to spin-orbital format for RDM.
     Note: the compact 2-RDM is stored as follows where A/B are spin up/down:
     RDM[pqrs] = <| a_{p, A}^\dagger a_{r, A}^\dagger a_{q, A} a_{s, A} |>
       for 'AA'/'BB' spins.
