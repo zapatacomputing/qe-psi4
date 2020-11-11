@@ -2,44 +2,45 @@ import psi4
 import numpy as np
 from openfermion import InteractionOperator, general_basis_change, MolecularData
 from openfermion.config import EQ_TOLERANCE
+from typing import Tuple
 
 
 def run_psi4(
-    geometry,
-    basis="STO-3G",
-    multiplicity=1,
-    charge=0,
-    method="scf",
-    reference="rhf",
-    freeze_core=False,
-    n_active=None,
-    save_hamiltonian=False,
-    options=None,
-    n_active_extract=None,
-    n_occupied_extract=None,
-    freeze_core_extract=False,
-):
+    geometry: dict,
+    basis: str = "STO-3G",
+    multiplicity: int = 1,
+    charge: int = 0,
+    method: str = "scf",
+    reference: str = "rhf",
+    freeze_core: bool = False,
+    n_active: int = None,
+    save_hamiltonian: bool = False,
+    options: dict = None,
+    n_active_extract: int = None,
+    n_occupied_extract: int = None,
+    freeze_core_extract: bool = False,
+) -> Tuple[dict, InteractionOperator]:
     """Generate an input file in the Psi4 python domain-specific language for
     a molecule.
     
     Args:
-        geometry (dict): a dictionary containing the molecule geometry.
-        basis (str): which basis set to use
-        multiplicity (int): spin multiplicity
-        charge (int): charge of the molecule
-        method (str): which calculation method to use
-        reference (str): which reference wavefunction to use. fno- energy methods are only compatible with RHF
-        freeze_core (bool): Whether to freeze occupied core orbitals
-        n_active (int): Number of active orbitals. Freeze virtual orbitals that do not fit on the qubits.
-        save_hamiltonian (bool): whether to save the Hamiltonian to a file. If True, symmetry will be disabled.
-        options (dict): additional commands to be passed to Psi4
-        n_active_extract (int): number of molecular orbitals to include in the
+        geometry: a dictionary containing the molecule geometry.
+        basis: which basis set to use
+        multiplicity: spin multiplicity
+        charge: charge of the molecule
+        method: which calculation method to use
+        reference: which reference wavefunction to use. fno- energy methods are only compatible with RHF
+        freeze_core: Whether to freeze occupied core orbitals
+        n_active: Number of active orbitals. Freeze virtual orbitals that do not fit on the qubits.
+        save_hamiltonian: whether to save the Hamiltonian to a file. If True, symmetry will be disabled.
+        options: additional commands to be passed to Psi4
+        n_active_extract: number of molecular orbitals to include in the
             saved Hamiltonian. If None, includes all orbitals.
-        n_occupied_extract (int): number of occupied molecular orbitals to
+        n_occupied_extract: number of occupied molecular orbitals to
             include in the saved Hamiltonian. Must be less than or equal to
             n_active_extract. If None, all occupied orbitals are included,
             except the core orbitals if freeze_core_extract is set to True.
-        freeze_core_extract (bool): If True, frozen core orbitals will always be
+        freeze_core_extract: If True, frozen core orbitals will always be
             doubly occupied in the saved Hamiltonian. Ignored if
             n_occupied_extract is not None.
         
@@ -66,9 +67,15 @@ def run_psi4(
         geometry_str += "symmetry c1\n"
 
     molecule = psi4.geometry(geometry_str)
-    psi4.set_options(
-        {"reference": reference, "basis": basis, "freeze_core": freeze_core}
-    )
+    combined_options = {
+        "reference": reference,
+        "basis": basis,
+        "freeze_core": freeze_core,
+    }
+    if options:
+        combined_options.update(options)
+    psi4.set_options(combined_options)
+
     energy, wavefunction = psi4.energy(method, return_wfn=True)
 
     results = {
