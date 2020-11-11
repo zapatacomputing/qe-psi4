@@ -72,7 +72,8 @@ def run_psi4(
         "basis": basis,
         "freeze_core": freeze_core,
     }
-    combined_options.update(options)
+    if options:
+        combined_options.update(options)
     psi4.set_options(combined_options)
 
     energy, wavefunction = psi4.energy(method, return_wfn=True)
