@@ -211,6 +211,8 @@ def test_run_psi4_using_n_occupied_extract_with_rdms_0():
     energy_from_rdm = rdm.expectation(hamiltonian)
     assert math.isclose(energy, energy_from_rdm)
 
+# This test may not play well with Psi4 because of 0 electrons in FCI, so I commented it
+# out for now.
 #def test_run_psi4_using_n_occupied_extract_with_rdms_1():
 #    results, hamiltonian, rdm = run_psi4(
 #        dilithium_geometry,
@@ -299,6 +301,7 @@ def test_run_psi4_freeze_core_extract_and_rdms():
     # With STO-3G, each Li atom has one 1s orbital, one 2s orbital, and three 2p orbitals. The 1s orbitals are considered core orbitals.
     assert hamiltonian.n_qubits == 2 * 2 * (1 + 3)
     assert rdm.one_body_tensor.shape[0] == 2 * 2 * (1 + 3)
+    assert math.isclose(np.einsum("ii->", rdm.one_body_tensor), 2)
 
     energy_from_rdm = rdm.expectation(hamiltonian)
     assert math.isclose(results["energy"], energy_from_rdm)
