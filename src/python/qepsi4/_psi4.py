@@ -8,7 +8,7 @@ from openfermion.config import EQ_TOLERANCE
 def select_active_space(mol, wfn, n_active_extract=None, n_occupied_extract=None, freeze_core_extract=False):
     """ Helper function to calculate the number of doubly occupied, active and virtual orbitals when extracting Hamiltonian/RDM 
     Args:
-        mol (psi4.core.Molecule): Psi4 object contianing information about the molecule
+        mol (psi4.core.Molecule): Psi4 object containing information about the molecule
             including geometry, charge, symmetry and spin multiplicity
         wfn (psi4.core.Wavefunction): Psi4 Wavefunction object; contains basis set info
         n_active_extract (int): number of molecular orbitals to include in the
@@ -23,10 +23,6 @@ def select_active_space(mol, wfn, n_active_extract=None, n_occupied_extract=None
     """
     # Check the input parameters (should we add more checks?)
     if n_active_extract is not None:
-        if wfn.nalpha() != wfn.nbeta():
-            raise ValueError(
-                f"Requesting a number of occupied molecular orbitals not supported when number of alpha and beta electrons is unequal."
-            )
         if wfn.nmo() < n_active_extract:
             raise ValueError(
                 f"Number of active orbitals exceeds the number of basis functions."
@@ -37,6 +33,10 @@ def select_active_space(mol, wfn, n_active_extract=None, n_occupied_extract=None
                     f"Number of occupied molecular orbitals to extract ({n_occupied_extract}) is larger than total number of molecular orbitals to extract ({n_active_extract})."
                 )
     if n_occupied_extract is not None:
+        if wfn.nalpha() != wfn.nbeta():
+            raise ValueError(
+                f"Requesting a number of occupied molecular orbitals not supported when number of alpha and beta electrons is unequal."
+            )
         if n_occupied_extract > wfn.nalpha():
             raise ValueError(
                 f"Number of occupied molecular orbitals to extract ({n_occupied_extract}) is larger than number of occupied molecular orbitals ({wfn.nalpha()})."
@@ -46,7 +46,7 @@ def select_active_space(mol, wfn, n_active_extract=None, n_occupied_extract=None
     # Number of cores for a given row of periodic table 
     chemical_core_orbitals = { 1 : 0, 2 : qc.periodictable.to_Z('He') // 2, 3 : qc.periodictable.to_Z('Ne') // 2, 4 : qc.periodictable.to_Z('Ar') // 2 }
 
-    nfrzc = 0 # number of orbitals to freeze if freeze_core = True
+    nfrzc = 0 # number of orbitals to freeze if freeze_core_extract = True
     for i in range(mol.natom()):
         atom = mol.label(i)
         ncore = chemical_core_orbitals.get(qc.periodictable.to_period(atom), None)
@@ -60,15 +60,6 @@ def select_active_space(mol, wfn, n_active_extract=None, n_occupied_extract=None
     if freeze_core_extract and n_occupied_extract is None:
         n_core_extract = nfrzc
     elif n_occupied_extract is not None: # n_occupied_extract overrides freeze_core_extract=True
-        if wfn.nalpha() != wfn.nbeta():
-            raise ValueError(
-                f"Requesting a number of occupied molecular orbitals not supported when number of alpha and beta electrons is unequal."
-            )
-        if n_occupied_extract > wfn.nalpha():
-            raise ValueError(
-                f"Number of occupied molecular orbitals to extract ({n_occupied_extract}) is larger than number of occupied molecular orbitals ({wfn.nalpha()})."
-            )
-
         n_core_extract = wfn.nalpha() - n_occupied_extract
 
     if n_active_extract is not None:
@@ -77,13 +68,13 @@ def select_active_space(mol, wfn, n_active_extract=None, n_occupied_extract=None
                 f"Active space dimension ({n_active_extract}) is inconsistent with the number of doubly occupied oribtals ({n_core_extract}) and basis set size ({wfn.nmo()})."
             )
         else:
-            n_virtual_extract = wfn.nmo() - n_core_extract - n_active_extract
+            n_frozen_virtuals = wfn.nmo() - n_core_extract - n_active_extract
     else:
         n_active_extract = wfn.nmo() - n_core_extract
-        n_virtual_extract = 0
+        n_frozen_virtuals = 0
         assert n_active_extract > 0
 
-    return n_core_extract, n_active_extract, n_virtual_extract
+    return n_core_extract, n_active_extract, n_frozen_virtuals
 
 def run_psi4(
     geometry,
@@ -156,18 +147,19 @@ def run_psi4(
 
     # Create a fake wave function and use it to select the active space based on the input parameters
     fake_wfn = psi4.core.Wavefunction.build(molecule, psi4.core.get_global_option('basis')) 
-    ndocc, nact, nvir = select_active_space(molecule, fake_wfn, n_active_extract=n_active_extract, \
+    ndocc, nact, n_frozen_vir = select_active_space(molecule, fake_wfn, n_active_extract=n_active_extract, \
             n_occupied_extract=n_occupied_extract, freeze_core_extract=freeze_core_extract)
 
     if method == 'fci' or method == 'cis' or method == 'cisd' or method == 'cisdt' or method == 'cisdtq':
         psi4.set_options({'qc_module' : 'detci' })
         if save_rdms:
-            psi4.set_options({'opdm' : True, 'tpdm' : True, 'frozen_docc' : ndocc, 'frozen_uocc' : nvir}) # this overrides freeze_core = True
+            assert molecule.point_group().symbol() == 'c1' # otherwise frozen_docc and frozen_uocc should be arrays specifying number of orbitals per irrep
+            psi4.set_options({'opdm' : True, 'tpdm' : True, 'frozen_docc' : ndocc, 'frozen_uocc' : n_frozen_vir}) # this overrides freeze_core = True
 
     energy, wavefunction = psi4.energy(method, return_wfn=True)
 
     # Perform a sanity check to make sure that the active space was selected correctly
-    assert wavefunction.nmo() == (ndocc + nact + nvir)
+    assert wavefunction.nmo() == (ndocc + nact + n_frozen_vir)
     #if method != 'scf':  
     #    assert wavefunction.fzvpi().sum() == nvir 
 
@@ -304,7 +296,7 @@ def get_rdms_from_psi4(wfn,
     Args:
         wfn (psi4.core.Wavefunction): Psi4 wavefunction object
         ndocc (int): number of doubly occupied molecular orbitals to
-            include in the saved RDM. 
+            exclude from the saved RDM. 
         nact (int): number of active molecular orbitals to include in the
             saved RDM. 
     Returns:
@@ -323,6 +315,9 @@ def get_rdms_from_psi4(wfn,
         0, 0, 'B', True)).reshape(wfn.nmo(), wfn.nmo())
 
     # Get 2-RDM from CI calculation.
+
+    assert nact == wfn.nmo() - wfn.nfrzc() - wfn.frzvpi().sum()
+    assert ndocc == wfn.nfrzc() 
 
     two_rdm_aa = np.array(wfn.get_tpdm(
         'AA', False)).reshape(nact, nact,
