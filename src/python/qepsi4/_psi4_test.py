@@ -139,7 +139,8 @@ def test_run_psi4_1():
     qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
     energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 2) # This should give RHF energy
 
-    assert math.isclose(energy, results["energy"], rel_tol=1e-3) # Note: this test only passes if rel_tol=1e-3 or lower; we should investigate this
+    assert math.isclose(energy, results["energy"], rel_tol=1e-3) # since the energy is calculated with scf_type df by default, the test fails for a lower rel_tol
+    #assert math.isclose(energy, results["energy"])
 
 def test_run_psi4_2():
 
@@ -155,7 +156,8 @@ def test_run_psi4_2():
     qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
     energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 0) # This should give RHF energy in the 0-particle sector of the Fock space
 
-    assert math.isclose(energy, results["energy"], rel_tol=1e-3) # Note: same as the previous test; it is not affected by EQ_TOLERANCE and could be due to a bug in the OpenFermion
+    assert math.isclose(energy, results["energy"], rel_tol=1e-3) # since the energy is calculated with scf_type df by default, the test fails for a lower rel_tol
+    #assert math.isclose(energy, results["energy"])
 
 def test_get_rdms_from_psi4_0():
 

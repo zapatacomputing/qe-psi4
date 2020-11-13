@@ -141,6 +141,7 @@ def run_psi4(
     molecule = psi4.geometry(geometry_str)
 
     psi4.set_options(
+        #{"reference": reference, "basis": basis, "freeze_core": freeze_core, 'scf_type' : 'pk'}
         {"reference": reference, "basis": basis, "freeze_core": freeze_core}
     )
 
@@ -175,13 +176,9 @@ def run_psi4(
     hamiltonian = None
     if save_hamiltonian:
         mints = psi4.core.MintsHelper(wavefunction.basisset())
-        orbitals = wavefunction.Ca().to_array(dense=True)
-        orbitals = orbitals[:, :ndocc + nact]
-        orbitals = psi4.core.Matrix.from_array(orbitals)
         hamiltonian = get_ham_from_psi4(
             wavefunction,
             mints,
-            orbs=orbitals,
             ndocc=ndocc,
             nact=nact,
             nuclear_repulsion_energy=molecule.nuclear_repulsion_energy(),
@@ -202,7 +199,6 @@ def run_psi4(
 def get_ham_from_psi4(
     wfn,
     mints,
-    orbs=None,
     ndocc=None,
     nact=None,
     nuclear_repulsion_energy=0,
@@ -212,8 +208,6 @@ def get_ham_from_psi4(
     Args:
         wfn (psi4.core.Wavefunction): Psi4 wavefunction object
         mints (psi4.core.MintsHelper): Psi4 molecular integrals helper
-        orbs (psi4.core.Matrix): Psi4 orbitals for active space transformations. Must
-            include all occupied (also core in all cases).
         ndocc (int): number of doubly occupied molecular orbitals to
             include in the saved Hamiltonian. 
         nact (int): number of active molecular orbitals to include in the
@@ -230,12 +224,33 @@ def get_ham_from_psi4(
         + "with different alpha and beta orbitals not yet supported :("
     )
 
+    orbitals = wfn.Ca().to_array(dense=True)
+
+    if nact is None and ndocc is None:
+        trf_mat = orbitals
+        ndocc = 0
+        nact = orbitals.shape[1]
+        print(f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}")
+    elif nact is not None and ndocc is None:
+        assert nact <= orbitals.shape[1]
+        ndocc = 0
+        trf_mat = orbitals[:, :nact]
+        print(f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}")
+    elif ndocc is not None and nact is None:
+        assert ndocc <= orbitals.shape[1]
+        nact = orbitals.shape[1] - ndocc
+        trf_mat = orbitals
+        print(f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}")
+    else:
+        assert (
+            orbitals.shape[1] >= nact + ndocc
+        )
+        trf_mat = orbitals[:, :nact + ndocc]
 
     # Note: code refactored to use Psi4 integral-transformation routines
     # no more storing the whole two-electron integral tensor when only an
     # active space is needed
 
-    orbitals = wfn.Ca().to_array(dense=True)
     one_body_integrals = general_basis_change(
         np.asarray(mints.ao_kinetic()), orbitals, (1, 0)
     )
@@ -245,21 +260,8 @@ def get_ham_from_psi4(
 
     # Build the transformation matrices, i.e. the orbitals for which
     # we want the integrals, as Psi4.core.Matrix objects
-    if orbs is not None:
-        if nact is None or ndocc is None:
-            print(f"One of the active space selection parameters (nact, ndocc) is None. ndocc will be reset to 0 and nact will be set to match the size of orbs.")
-            ndocc = 0
-            nact = orbs.to_array(dense=True).shape[1]
-        else:
-            assert (
-                orbs.to_array(dense=True).shape[1] == nact + ndocc
-            )
-        trf_mat = orbs
-    else:
-        trf_mat = wfn.Ca()
-        print(f"orbs parameter is not provided. ndocc will be reset to 0 and nact will be set to match the size of wfn.Ca().")
-        ndocc = 0
-        nact = wfn.Ca().to_array(dense=True).shape[1]
+    
+    trf_mat = psi4.core.Matrix.from_array(trf_mat)
 
     two_body_integrals = np.asarray(mints.mo_eri(trf_mat, trf_mat, trf_mat, trf_mat))
     n_orbitals = trf_mat.shape[1]
@@ -304,10 +306,18 @@ def get_rdms_from_psi4(wfn,
             1- and 2-RDMs. 
     """
 
-    if nact is None or ndocc is None:
-        print(f"One of the active space selection parameters (nact, ndocc) is None. ndocc will be reset to 0 and nact will be set to match the size wfn.Ca().")
+    if nact is None and ndocc is None:
         ndocc = 0
         nact = wfn.Ca().to_array(dense=True).shape[1]
+        print(f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}")
+    elif nact is not None and ndocc is None:
+        assert nact <= wfn.Ca().to_array(dense=True).shape[1]
+        ndocc = 0
+        print(f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}")
+    elif ndocc is not None and nact is None:
+        assert ndocc <= wfn.Ca().to_array(dense=True).shape[1]
+        nact = wfn.Ca().to_array(dense=True).shape[1] - ndocc
+        print(f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}")
 
     one_rdm_a = np.array(wfn.get_opdm(
         0, 0, 'A', True)).reshape(wfn.nmo(), wfn.nmo()) 
