@@ -133,7 +133,7 @@ def test_run_psi4_1():
     assert results["n_beta"] == 1
     assert results["n_mo"] == 2
     assert results["n_frozen_core"] == 0
-    assert results["n_frozen_valence"] == 0
+    assert results["n_frozen_valence"] == 1
 
     assert hamiltonian.n_qubits == 2
     qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
@@ -149,7 +149,7 @@ def test_run_psi4_2():
     assert results["n_alpha"] == 1
     assert results["n_beta"] == 1
     assert results["n_mo"] == 2
-    assert results["n_frozen_core"] == 0
+    assert results["n_frozen_core"] == 1
     assert results["n_frozen_valence"] == 0
 
     assert hamiltonian.n_qubits == 2
