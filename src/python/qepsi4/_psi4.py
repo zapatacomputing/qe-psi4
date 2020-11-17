@@ -85,7 +85,6 @@ def run_psi4(
     method: str = "scf",
     reference: str = "rhf",
     freeze_core: bool = False,
-    n_active: int = None,
     save_hamiltonian: bool = False,
     options: dict = None,
     n_active_extract: int = None,
@@ -104,7 +103,6 @@ def run_psi4(
         method: which calculation method to use
         reference: which reference wavefunction to use. fno- energy methods are only compatible with RHF
         freeze_core: Whether to freeze occupied core orbitals
-        n_active: Number of active orbitals. Freeze virtual orbitals that do not fit on the qubits.
         save_hamiltonian: whether to save the Hamiltonian to a file. If True, symmetry will be disabled.
         options: additional commands to be passed to Psi4
         n_active_extract: number of molecular orbitals to include in the
