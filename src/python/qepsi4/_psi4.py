@@ -141,7 +141,6 @@ def run_psi4(
     molecule = psi4.geometry(geometry_str)
 
     psi4.set_options(
-        #{"reference": reference, "basis": basis, "freeze_core": freeze_core, 'scf_type' : 'pk'}
         {"reference": reference, "basis": basis, "freeze_core": freeze_core}
     )
 
@@ -152,15 +151,14 @@ def run_psi4(
             n_occupied_extract=n_occupied_extract, freeze_core_extract=freeze_core_extract)
 
     if ndocc != 0:
-        psi4.set_options({'frozen_docc' : ndocc})
+        psi4.set_options({'num_frozen_docc' : ndocc})
     if n_frozen_vir != 0:
-        psi4.set_options({'frozen_uocc' : n_frozen_vir})
+        assert molecule.point_group().symbol() == 'c1' # otherwise frozen_uocc should be an array specifying number of orbitals per irrep
+        psi4.set_options({'frozen_uocc' : [n_frozen_vir]})
 
     if method == 'fci' or method == 'cis' or method == 'cisd' or method == 'cisdt' or method == 'cisdtq':
         psi4.set_options({'qc_module' : 'detci' })
         if save_rdms:
-            assert molecule.point_group().symbol() == 'c1' # otherwise frozen_docc and frozen_uocc should be arrays specifying number of orbitals per irrep
-            #psi4.set_options({'opdm' : True, 'tpdm' : True, 'frozen_docc' : ndocc, 'frozen_uocc' : n_frozen_vir}) # this overrides freeze_core = True
             psi4.set_options({'opdm' : True, 'tpdm' : True}) 
 
     energy, wavefunction = psi4.energy(method, return_wfn=True)
