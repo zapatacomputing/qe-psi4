@@ -13,11 +13,11 @@ def run_psi4(
     charge=0,
     multiplicity=1,
     save_hamiltonian=False,
+    save_rdms=False,
     n_active_extract="None",
     n_occupied_extract="None",
     freeze_core_extract=False,
     nthreads=1,
-    n_active="None",
     options="None",
     wavefunction="None",
 ):
@@ -40,21 +40,40 @@ def run_psi4(
     with open(geometry) as f:
         geometry = json.load(f)
 
-    results, hamiltonian = _run_psi4(
-        geometry,
-        basis=basis,
-        multiplicity=multiplicity,
-        charge=charge,
-        method=method,
-        reference=reference,
-        freeze_core=freeze_core,
-        n_active=n_active,
-        save_hamiltonian=save_hamiltonian,
-        options=options,
-        n_active_extract=n_active_extract,
-        n_occupied_extract=n_occupied_extract,
-        freeze_core_extract=freeze_core_extract,
-    )
+    if not save_rdms:
+
+        results, hamiltonian, rdms = _run_psi4(
+            geometry,
+            basis=basis,
+            multiplicity=multiplicity,
+            charge=charge,
+            method=method,
+            reference=reference,
+            freeze_core=freeze_core,
+            save_hamiltonian=save_hamiltonian,
+            save_rdms=save_rdms,
+            options=options,
+            n_active_extract=n_active_extract,
+            n_occupied_extract=n_occupied_extract,
+            freeze_core_extract=freeze_core_extract,
+        )
+    else:
+        results, hamiltonian = _run_psi4(
+            geometry,
+            basis=basis,
+            multiplicity=multiplicity,
+            charge=charge,
+            method=method,
+            reference=reference,
+            freeze_core=freeze_core,
+            save_hamiltonian=save_hamiltonian,
+            save_rdms=save_rdms,
+            options=options,
+            n_active_extract=n_active_extract,
+            n_occupied_extract=n_occupied_extract,
+            freeze_core_extract=freeze_core_extract,
+        )
+
 
     results["schema"] = SCHEMA_VERSION + "-energy_calc"
     with open("energycalc-results.json", "w") as f:
@@ -62,6 +81,9 @@ def run_psi4(
 
     if save_hamiltonian:
         save_interaction_operator(hamiltonian, "hamiltonian.json")
+
+    if save_rdms:
+        save_interaction_operator(rdms, "rdms.json")
 
     with open("n_alpha.txt", "w") as f:
         f.write(str(results["n_alpha"]))
