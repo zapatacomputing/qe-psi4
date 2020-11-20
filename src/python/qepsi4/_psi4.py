@@ -117,8 +117,8 @@ def run_psi4(
         save_rdms: If True, save 1- and 2-RDMs
         
     Returns:
-        results_dict: The results of the calculation (dict), Hamiltonian
-            (openfermion.InteractionOperator), and 1- and 2-RDMs (openfermion.op.InteractionRDM)
+        results_dict: Python dictionary with the results of the calculation (dict), Hamiltonian
+            (openfermion.ops.InteractionOperator), and 1- and 2-RDMs (openfermion.op.InteractionRDM)
     """
 
     if save_rdms and not method in ['fci', 'cis', 'cisd', 'cisdt', 'cisdtq']:
