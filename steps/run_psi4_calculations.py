@@ -28,8 +28,6 @@ def run_psi4(
         n_active_extract = None
     if n_occupied_extract == "None":
         n_occupied_extract = None
-    if n_active == "None":
-        n_active = None
     if options == "None":
         options = None
     else:
