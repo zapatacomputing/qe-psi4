@@ -1,6 +1,6 @@
 import os, json
 from qepsi4 import run_psi4 as _run_psi4
-from qeopenfermion import save_interaction_operator
+from qeopenfermion import save_interaction_operator, save_interaction_rdm
 from zquantum.core.utils import SCHEMA_VERSION
 
 
@@ -38,52 +38,34 @@ def run_psi4(
     with open(geometry) as f:
         geometry = json.load(f)
 
-    if save_rdms:
+    res = _run_psi4(
+        geometry,
+        basis=basis,
+        multiplicity=multiplicity,
+        charge=charge,
+        method=method,
+        reference=reference,
+        freeze_core=freeze_core,
+        save_hamiltonian=save_hamiltonian,
+        save_rdms=save_rdms,
+        options=options,
+        n_active_extract=n_active_extract,
+        n_occupied_extract=n_occupied_extract,
+        freeze_core_extract=freeze_core_extract,
+    )
 
-        results, hamiltonian, rdms = _run_psi4(
-            geometry,
-            basis=basis,
-            multiplicity=multiplicity,
-            charge=charge,
-            method=method,
-            reference=reference,
-            freeze_core=freeze_core,
-            save_hamiltonian=save_hamiltonian,
-            save_rdms=save_rdms,
-            options=options,
-            n_active_extract=n_active_extract,
-            n_occupied_extract=n_occupied_extract,
-            freeze_core_extract=freeze_core_extract,
-        )
-
-    elif save_hamiltonian:
-
-        results, hamiltonian = _run_psi4(
-            geometry,
-            basis=basis,
-            multiplicity=multiplicity,
-            charge=charge,
-            method=method,
-            reference=reference,
-            freeze_core=freeze_core,
-            save_hamiltonian=save_hamiltonian,
-            save_rdms=save_rdms,
-            options=options,
-            n_active_extract=n_active_extract,
-            n_occupied_extract=n_occupied_extract,
-            freeze_core_extract=freeze_core_extract,
-        )
-
-
+    results = res['results']
     results["schema"] = SCHEMA_VERSION + "-energy_calc"
     with open("energycalc-results.json", "w") as f:
         f.write(json.dumps(results, indent=2))
 
-    if save_hamiltonian:
+    hamiltonian = res.get('hamiltonian', None)
+    if hamiltonian is not None:
         save_interaction_operator(hamiltonian, "hamiltonian.json")
 
-    if save_rdms:
-        save_interaction_operator(rdms, "rdms.json")
+    rdms = res.get('rdms', None)
+    if rdms is not None:
+        save_interaction_rdm(rdms, "rdms.json")
 
     with open("n_alpha.txt", "w") as f:
         f.write(str(results["n_alpha"]))

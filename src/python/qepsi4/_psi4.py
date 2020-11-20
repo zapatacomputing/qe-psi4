@@ -3,7 +3,7 @@ from psi4 import qcel as qc # QCelemental (https://github.com/MolSSI/QCElemental
 import numpy as np
 from openfermion import InteractionOperator, general_basis_change, MolecularData, InteractionRDM
 from openfermion.config import EQ_TOLERANCE
-from typing import Tuple
+from typing import Tuple, Dict
 
 
 def select_active_space(mol, wfn, n_active_extract=None, n_occupied_extract=None, freeze_core_extract=False):
@@ -91,7 +91,7 @@ def run_psi4(
     n_occupied_extract: int = None,
     freeze_core_extract: bool = False,
     save_rdms: bool =False,
-) -> Tuple[dict, InteractionOperator]:
+):
     """Generate an input file in the Psi4 python domain-specific language for
     a molecule.
     
@@ -117,9 +117,8 @@ def run_psi4(
         save_rdms: If True, save 1- and 2-RDMs
         
     Returns:
-        tuple: The results of the calculation (dict) and the Hamiltonian
-            (openfermion.InteractionOperator). If save_rdms is requested the tuple
-            will also contain 1- and 2-RDMs (openfermion.op.InteractionRDM)
+        results_dict: The results of the calculation (dict), Hamiltonian
+            (openfermion.InteractionOperator), and 1- and 2-RDMs (openfermion.op.InteractionRDM)
     """
 
     if save_rdms and not method in ['fci', 'cis', 'cisd', 'cisdt', 'cisdtq']:
@@ -174,6 +173,8 @@ def run_psi4(
     #if method != 'scf':  
     #    assert wavefunction.fzvpi().sum() == nvir 
 
+    results_dict = {}
+
     results = {
         "energy": energy,
         "n_alpha": wavefunction.nalpha(),
@@ -194,17 +195,17 @@ def run_psi4(
             nuclear_repulsion_energy=molecule.nuclear_repulsion_energy(),
         )
 
+    rdm = None
     if save_rdms:
         rdm = get_rdms_from_psi4(wavefunction, ndocc=ndocc, nact=nact)
-        psi4.core.clean()
-        psi4.core.clean_options()
-        psi4.core.clean_variables()
-        return results, hamiltonian, rdm
-    else:
-        psi4.core.clean()
-        psi4.core.clean_options()
-        psi4.core.clean_variables()
-        return results, hamiltonian
+
+    results_dict['results'] = results
+    results_dict['hamiltonian'] = hamiltonian
+    results_dict['rdms'] = rdm
+    psi4.core.clean()
+    psi4.core.clean_options()
+    psi4.core.clean_variables()
+    return results_dict
 
 def get_ham_from_psi4(
     wfn,
