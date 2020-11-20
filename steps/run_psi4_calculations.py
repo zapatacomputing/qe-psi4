@@ -40,7 +40,7 @@ def run_psi4(
     with open(geometry) as f:
         geometry = json.load(f)
 
-    if not save_rdms:
+    if save_rdms:
 
         results, hamiltonian, rdms = _run_psi4(
             geometry,
@@ -57,7 +57,9 @@ def run_psi4(
             n_occupied_extract=n_occupied_extract,
             freeze_core_extract=freeze_core_extract,
         )
-    else:
+
+    elif save_hamiltonian:
+
         results, hamiltonian = _run_psi4(
             geometry,
             basis=basis,
