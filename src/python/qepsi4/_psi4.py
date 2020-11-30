@@ -135,7 +135,7 @@ def run_psi4(
         )
 
     geometry_str += "\nunits angstrom\n"
-    c1_sym = save_hamiltonian # or n_active
+    c1_sym = save_hamiltonian or save_rdms
     if c1_sym:
         geometry_str += "symmetry c1\n"
 
