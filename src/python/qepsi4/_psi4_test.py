@@ -129,10 +129,12 @@ def test_run_psi4_0():
 
 def test_run_psi4_1():
 
-    results_dict = run_psi4(hydrogen_geometry, save_hamiltonian=True, n_active_extract=1)
+    options = {'scf_type' : 'pk'} # triggers exact ERI calculation
+
+    results_dict = run_psi4(hydrogen_geometry, save_hamiltonian=True, n_active_extract=1, options=options)
     results = results_dict['results'] 
     hamiltonian = results_dict['hamiltonian']
-    assert math.isclose(results["energy"], -0.8544322638069642)
+    assert math.isclose(results["energy"],  -0.8543376267387818) # reference value from Psi4; differs from E(RHF) with scf_type = df
     assert results["n_alpha"] == 1
     assert results["n_beta"] == 1
     assert results["n_mo"] == 2
@@ -143,15 +145,16 @@ def test_run_psi4_1():
     qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
     energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 2) # This should give RHF energy
 
-    assert math.isclose(energy, results["energy"], rel_tol=1e-3) # since the energy is calculated with scf_type df by default, the test fails for a lower rel_tol
-    #assert math.isclose(energy, results["energy"])
+    assert math.isclose(energy, results["energy"])
 
 def test_run_psi4_2():
 
-    results_dict = run_psi4(hydrogen_geometry, save_hamiltonian=True, n_active_extract=1, n_occupied_extract=0)
+    options = {'scf_type' : 'pk'} # triggers exact ERI calculation
+
+    results_dict = run_psi4(hydrogen_geometry, save_hamiltonian=True, n_active_extract=1, n_occupied_extract=0, options=options)
     results = results_dict['results'] 
     hamiltonian = results_dict['hamiltonian']
-    assert math.isclose(results["energy"], -0.8544322638069642)
+    assert math.isclose(results["energy"],  -0.8543376267387818)
     assert results["n_alpha"] == 1
     assert results["n_beta"] == 1
     assert results["n_mo"] == 2
@@ -162,8 +165,7 @@ def test_run_psi4_2():
     qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
     energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 0) # This should give RHF energy in the 0-particle sector of the Fock space
 
-    assert math.isclose(energy, results["energy"], rel_tol=1e-3) # since the energy is calculated with scf_type df by default, the test fails for a lower rel_tol
-    #assert math.isclose(energy, results["energy"])
+    assert math.isclose(energy, results["energy"])
 
 def test_get_rdms_from_psi4_0():
 
@@ -184,6 +186,15 @@ def test_get_rdms_from_psi4_0():
 
     assert math.isclose(energy, energy_from_rdm)
 
+def test_get_rdms_from_psi4_1():
+
+    results_dict = run_psi4(hydrogen_geometry, method='fci', basis='STO-3G', save_hamiltonian=False, save_rdms=True)
+    results = results_dict['results'] 
+    rdm = results_dict['rdms']
+    assert results["n_alpha"] == 1 and results["n_beta"] == 1 and results["n_mo"] == 2\
+                    and results["n_frozen_core"] == 0 and results["n_frozen_valence"] == 0
+
+    assert math.isclose(np.einsum("ii->", rdm.one_body_tensor), 2)
     
 def test_run_psi4_using_n_occupied_extract():
     results_dict = run_psi4(
