@@ -1,12 +1,20 @@
 import psi4
-from psi4 import qcel as qc # QCelemental (https://github.com/MolSSI/QCElemental)
+from psi4 import qcel as qc  # QCelemental (https://github.com/MolSSI/QCElemental)
 import numpy as np
-from openfermion import InteractionOperator, general_basis_change, MolecularData, InteractionRDM
+from openfermion import (
+    InteractionOperator,
+    general_basis_change,
+    MolecularData,
+    InteractionRDM,
+)
 from openfermion.config import EQ_TOLERANCE
 from typing import Tuple, Dict
+import warnings
 
 
-def select_active_space(mol, wfn, n_active_extract=None, n_occupied_extract=None, freeze_core_extract=False):
+def select_active_space(
+    mol, wfn, n_active_extract=None, n_occupied_extract=None, freeze_core_extract=False
+):
     """ Helper function to calculate the number of doubly occupied, active and virtual orbitals when extracting Hamiltonian/RDM 
     Args:
         mol (psi4.core.Molecule): Psi4 object containing information about the molecule
@@ -44,10 +52,15 @@ def select_active_space(mol, wfn, n_active_extract=None, n_occupied_extract=None
             )
 
     # Determine the number of core orbitals based on the molecular identity
-    # Number of cores for a given row of periodic table 
-    chemical_core_orbitals = { 1 : 0, 2 : qc.periodictable.to_Z('He') // 2, 3 : qc.periodictable.to_Z('Ne') // 2, 4 : qc.periodictable.to_Z('Ar') // 2 }
+    # Number of cores for a given row of periodic table
+    chemical_core_orbitals = {
+        1: 0,
+        2: qc.periodictable.to_Z("He") // 2,
+        3: qc.periodictable.to_Z("Ne") // 2,
+        4: qc.periodictable.to_Z("Ar") // 2,
+    }
 
-    nfrzc = 0 # number of orbitals to freeze if freeze_core_extract = True
+    nfrzc = 0  # number of orbitals to freeze if freeze_core_extract = True
     for i in range(mol.natom()):
         atom = mol.label(i)
         ncore = chemical_core_orbitals.get(qc.periodictable.to_period(atom), None)
@@ -60,7 +73,9 @@ def select_active_space(mol, wfn, n_active_extract=None, n_occupied_extract=None
     n_core_extract = 0
     if freeze_core_extract and n_occupied_extract is None:
         n_core_extract = nfrzc
-    elif n_occupied_extract is not None: # n_occupied_extract overrides freeze_core_extract=True
+    elif (
+        n_occupied_extract is not None
+    ):  # n_occupied_extract overrides freeze_core_extract=True
         n_core_extract = wfn.nalpha() - n_occupied_extract
 
     if n_active_extract is not None:
@@ -77,6 +92,7 @@ def select_active_space(mol, wfn, n_active_extract=None, n_occupied_extract=None
 
     return n_core_extract, n_active_extract, n_frozen_virtuals
 
+
 def run_psi4(
     geometry: dict,
     basis: str = "STO-3G",
@@ -90,7 +106,7 @@ def run_psi4(
     n_active_extract: int = None,
     n_occupied_extract: int = None,
     freeze_core_extract: bool = False,
-    save_rdms: bool =False,
+    save_rdms: bool = False,
 ):
     """Generate an input file in the Psi4 python domain-specific language for
     a molecule.
@@ -121,12 +137,11 @@ def run_psi4(
             (openfermion.ops.InteractionOperator), and 1- and 2-RDMs (openfermion.op.InteractionRDM)
     """
 
-    if save_rdms and not method in ['fci', 'cis', 'cisd', 'cisdt', 'cisdtq']:
+    if save_rdms and not method in ["fci", "cis", "cisd", "cisdt", "cisdtq"]:
         print(f"run_psi4 was called with method={method}")
-        raise Warning(
-            f"RDM calculation can only be performed for Configuration Interaction methods. save_rdms option will be ignored."
+        warnings.warn(
+            "RDM calculation can only be performed for Configuration Interaction methods. save_rdms option will be ignored."
         )
-
 
     geometry_str = f"{charge} {multiplicity}\n"
     for atom in geometry["sites"]:
@@ -151,27 +166,42 @@ def run_psi4(
     psi4.set_options(combined_options)
 
     # Create a fake wave function and use it to select the active space based on the input parameters
-    fake_wfn = psi4.core.Wavefunction.build(molecule, psi4.core.get_global_option('basis')) 
-    ndocc, nact, n_frozen_vir = select_active_space(molecule, fake_wfn, n_active_extract=n_active_extract, \
-            n_occupied_extract=n_occupied_extract, freeze_core_extract=freeze_core_extract)
+    fake_wfn = psi4.core.Wavefunction.build(
+        molecule, psi4.core.get_global_option("basis")
+    )
+    ndocc, nact, n_frozen_vir = select_active_space(
+        molecule,
+        fake_wfn,
+        n_active_extract=n_active_extract,
+        n_occupied_extract=n_occupied_extract,
+        freeze_core_extract=freeze_core_extract,
+    )
 
     if ndocc != 0:
-        psi4.set_options({'num_frozen_docc' : ndocc})
+        psi4.set_options({"num_frozen_docc": ndocc})
     if n_frozen_vir != 0:
-        assert molecule.point_group().symbol() == 'c1' # otherwise frozen_uocc should be an array specifying number of orbitals per irrep
-        psi4.set_options({'frozen_uocc' : [n_frozen_vir]})
+        assert (
+            molecule.point_group().symbol() == "c1"
+        )  # otherwise frozen_uocc should be an array specifying number of orbitals per irrep
+        psi4.set_options({"frozen_uocc": [n_frozen_vir]})
 
-    if method == 'fci' or method == 'cis' or method == 'cisd' or method == 'cisdt' or method == 'cisdtq':
-        psi4.set_options({'qc_module' : 'detci' })
+    if (
+        method == "fci"
+        or method == "cis"
+        or method == "cisd"
+        or method == "cisdt"
+        or method == "cisdtq"
+    ):
+        psi4.set_options({"qc_module": "detci"})
         if save_rdms:
-            psi4.set_options({'opdm' : True, 'tpdm' : True}) 
+            psi4.set_options({"opdm": True, "tpdm": True})
 
     energy, wavefunction = psi4.energy(method, return_wfn=True)
 
     # Perform a sanity check to make sure that the active space was selected correctly
     assert wavefunction.nmo() == (ndocc + nact + n_frozen_vir)
-    #if method != 'scf':  
-    #    assert wavefunction.fzvpi().sum() == nvir 
+    # if method != 'scf':
+    #    assert wavefunction.fzvpi().sum() == nvir
 
     results_dict = {}
 
@@ -199,20 +229,17 @@ def run_psi4(
     if save_rdms:
         rdm = get_rdms_from_psi4(wavefunction, ndocc=ndocc, nact=nact)
 
-    results_dict['results'] = results
-    results_dict['hamiltonian'] = hamiltonian
-    results_dict['rdms'] = rdm
+    results_dict["results"] = results
+    results_dict["hamiltonian"] = hamiltonian
+    results_dict["rdms"] = rdm
     psi4.core.clean()
     psi4.core.clean_options()
     psi4.core.clean_variables()
     return results_dict
 
+
 def get_ham_from_psi4(
-    wfn,
-    mints,
-    ndocc=None,
-    nact=None,
-    nuclear_repulsion_energy=0,
+    wfn, mints, ndocc=None, nact=None, nuclear_repulsion_energy=0,
 ):
     """Get a molecular Hamiltonian from a Psi4 calculation.
 
@@ -241,22 +268,26 @@ def get_ham_from_psi4(
         trf_mat = orbitals
         ndocc = 0
         nact = orbitals.shape[1]
-        print(f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}")
+        print(
+            f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}"
+        )
     elif nact is not None and ndocc is None:
         assert nact <= orbitals.shape[1]
         ndocc = 0
         trf_mat = orbitals[:, :nact]
-        print(f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}")
+        print(
+            f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}"
+        )
     elif ndocc is not None and nact is None:
         assert ndocc <= orbitals.shape[1]
         nact = orbitals.shape[1] - ndocc
         trf_mat = orbitals
-        print(f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}")
-    else:
-        assert (
-            orbitals.shape[1] >= nact + ndocc
+        print(
+            f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}"
         )
-        trf_mat = orbitals[:, :nact + ndocc]
+    else:
+        assert orbitals.shape[1] >= nact + ndocc
+        trf_mat = orbitals[:, : nact + ndocc]
 
     # Note: code refactored to use Psi4 integral-transformation routines
     # no more storing the whole two-electron integral tensor when only an
@@ -271,7 +302,7 @@ def get_ham_from_psi4(
 
     # Build the transformation matrices, i.e. the orbitals for which
     # we want the integrals, as Psi4.core.Matrix objects
-    
+
     trf_mat = psi4.core.Matrix.from_array(trf_mat)
 
     two_body_integrals = np.asarray(mints.mo_eri(trf_mat, trf_mat, trf_mat, trf_mat))
@@ -300,9 +331,8 @@ def get_ham_from_psi4(
 
     return hamiltonian
 
-def get_rdms_from_psi4(wfn, 
-    ndocc=None, 
-    nact=None):
+
+def get_rdms_from_psi4(wfn, ndocc=None, nact=None):
 
     """Get 1- and 2-RDMs from a Psi4 calculation.
 
@@ -320,55 +350,50 @@ def get_rdms_from_psi4(wfn,
     if nact is None and ndocc is None:
         ndocc = 0
         nact = wfn.Ca().to_array(dense=True).shape[1]
-        print(f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}")
+        print(
+            f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}"
+        )
     elif nact is not None and ndocc is None:
         assert nact <= wfn.Ca().to_array(dense=True).shape[1]
         ndocc = 0
-        print(f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}")
+        print(
+            f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}"
+        )
     elif ndocc is not None and nact is None:
         assert ndocc <= wfn.Ca().to_array(dense=True).shape[1]
         nact = wfn.Ca().to_array(dense=True).shape[1] - ndocc
-        print(f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}")
+        print(
+            f"Active space selection options were reset to: ndocc = {ndocc} and  nact = {nact}"
+        )
 
-    one_rdm_a = np.array(wfn.get_opdm(
-        0, 0, 'A', True)).reshape(wfn.nmo(), wfn.nmo()) 
-    one_rdm_b = np.array(wfn.get_opdm(
-        0, 0, 'B', True)).reshape(wfn.nmo(), wfn.nmo())
+    one_rdm_a = np.array(wfn.get_opdm(0, 0, "A", True)).reshape(wfn.nmo(), wfn.nmo())
+    one_rdm_b = np.array(wfn.get_opdm(0, 0, "B", True)).reshape(wfn.nmo(), wfn.nmo())
 
     # Get 2-RDM from CI calculation.
 
     assert nact == wfn.nmo() - wfn.nfrzc() - wfn.frzvpi().sum()
-    assert ndocc == wfn.nfrzc() 
+    assert ndocc == wfn.nfrzc()
 
-    two_rdm_aa = np.array(wfn.get_tpdm(
-        'AA', False)).reshape(nact, nact,
-                                nact, nact)
-    two_rdm_ab = np.array(wfn.get_tpdm(
-        'AB', False)).reshape(nact, nact,
-                                nact, nact)
-    two_rdm_bb = np.array(wfn.get_tpdm(
-        'BB', False)).reshape(nact, nact,
-                                nact, nact)
+    two_rdm_aa = np.array(wfn.get_tpdm("AA", False)).reshape(nact, nact, nact, nact)
+    two_rdm_ab = np.array(wfn.get_tpdm("AB", False)).reshape(nact, nact, nact, nact)
+    two_rdm_bb = np.array(wfn.get_tpdm("BB", False)).reshape(nact, nact, nact, nact)
 
     # adjusting 1-RDM
     # Indices of active molecular orbitals
     active_indices = range(ndocc, ndocc + nact)
     one_rdm_a = one_rdm_a[np.ix_(active_indices, active_indices)]
     one_rdm_b = one_rdm_b[np.ix_(active_indices, active_indices)]
-   
+
     one_rdm, two_rdm = unpack_spatial_rdm(
-    one_rdm_a, one_rdm_b, two_rdm_aa,
-    two_rdm_ab, two_rdm_bb)
+        one_rdm_a, one_rdm_b, two_rdm_aa, two_rdm_ab, two_rdm_bb
+    )
 
     rdms = InteractionRDM(one_rdm, two_rdm)
 
     return rdms
 
-def unpack_spatial_rdm(one_rdm_a,
-                       one_rdm_b,
-                       two_rdm_aa,
-                       two_rdm_ab,
-                       two_rdm_bb):
+
+def unpack_spatial_rdm(one_rdm_a, one_rdm_b, two_rdm_aa, two_rdm_ab, two_rdm_bb):
     r"""
     Convert from spin compact spatial format to spin-orbital format for RDM.
     Note: the compact 2-RDM is stored as follows where A/B are spin up/down:
@@ -397,8 +422,7 @@ def unpack_spatial_rdm(one_rdm_a,
     n_orbitals = one_rdm_a.shape[0]
     n_qubits = 2 * n_orbitals
     one_rdm = np.zeros((n_qubits, n_qubits))
-    two_rdm = np.zeros((n_qubits, n_qubits,
-                           n_qubits, n_qubits))
+    two_rdm = np.zeros((n_qubits, n_qubits, n_qubits, n_qubits))
 
     # Unpack compact representation.
     for p in range(n_orbitals):
@@ -413,21 +437,21 @@ def unpack_spatial_rdm(one_rdm_a,
                 for s in range(n_orbitals):
 
                     # Handle case of same spin.
-                    two_rdm[2 * p, 2 * q, 2 * r, 2 * s] = (
-                        two_rdm_aa[p, r, q, s])
-                    two_rdm[2 * p + 1, 2 * q + 1, 2 * r + 1, 2 * s + 1] = (
-                        two_rdm_bb[p, r, q, s])
+                    two_rdm[2 * p, 2 * q, 2 * r, 2 * s] = two_rdm_aa[p, r, q, s]
+                    two_rdm[2 * p + 1, 2 * q + 1, 2 * r + 1, 2 * s + 1] = two_rdm_bb[
+                        p, r, q, s
+                    ]
 
                     # Handle case of mixed spin.
-                    two_rdm[2 * p, 2 * q + 1, 2 * r, 2 * s + 1] = (
-                        two_rdm_ab[p, r, q, s])
+                    two_rdm[2 * p, 2 * q + 1, 2 * r, 2 * s + 1] = two_rdm_ab[p, r, q, s]
                     two_rdm[2 * p, 2 * q + 1, 2 * r + 1, 2 * s] = (
-                        -1. * two_rdm_ab[p, s, q, r])
-                    two_rdm[2 * p + 1, 2 * q, 2 * r + 1, 2 * s] = (
-                        two_rdm_ab[q, s, p, r])
+                        -1.0 * two_rdm_ab[p, s, q, r]
+                    )
+                    two_rdm[2 * p + 1, 2 * q, 2 * r + 1, 2 * s] = two_rdm_ab[q, s, p, r]
                     two_rdm[2 * p + 1, 2 * q, 2 * r, 2 * s + 1] = (
-                        -1. * two_rdm_ab[q, r, p, s])
+                        -1.0 * two_rdm_ab[q, r, p, s]
+                    )
 
     # Map to physicist notation and return.
-    two_rdm = np.einsum('pqsr', two_rdm)
+    two_rdm = np.einsum("pqsr", two_rdm)
     return one_rdm, two_rdm
