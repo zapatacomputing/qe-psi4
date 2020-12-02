@@ -27,10 +27,10 @@ spec:
         default: 'False'
       - name: nthreads
         default: 1
-      - name: n-active
-        default: None
       - name: options
         default: None
+      - name: save-rdms
+        default: False
       - name: command
         value: bash main_script.sh
       artifacts:
@@ -65,12 +65,12 @@ spec:
                      method='{{inputs.parameters.method}}',
                      reference='{{inputs.parameters.reference}}',
                      freeze_core={{inputs.parameters.freeze-core}},
-                     n_active={{inputs.parameters.n-active}},
                      save_hamiltonian={{inputs.parameters.save-hamiltonian}},
                      options={{inputs.parameters.options}},
                      n_active_extract={{inputs.parameters.n-active-extract}},
                      n_occupied_extract={{inputs.parameters.n-occupied-extract}},
-                     freeze_core_extract={{inputs.parameters.freeze-core-extract}})
+                     freeze_core_extract={{inputs.parameters.freeze-core-extract}},
+                     save_rdms = {{inputs.parameters.save-rdms}})
             
             results['schema'] = SCHEMA_VERSION + '-energy_calc'
             with open('energycalc-results.json', 'w') as f:
