@@ -30,7 +30,7 @@ spec:
       - name: options
         default: None
       - name: save-rdms
-        default: False
+        default: 'False'
       - name: command
         value: bash main_script.sh
       artifacts:
@@ -58,7 +58,7 @@ spec:
             with open('geometry.json') as f:
               geometry = json.load(f)
 
-            results, hamiltonian = run_psi4(geometry,
+            res = run_psi4(geometry,
                      basis='{{inputs.parameters.basis}}',
                      multiplicity={{inputs.parameters.multiplicity}},
                      charge={{inputs.parameters.charge}},
@@ -70,14 +70,22 @@ spec:
                      n_active_extract={{inputs.parameters.n-active-extract}},
                      n_occupied_extract={{inputs.parameters.n-occupied-extract}},
                      freeze_core_extract={{inputs.parameters.freeze-core-extract}},
-                     save_rdms = {{inputs.parameters.save-rdms}})
+                     save_rdms={{inputs.parameters.save-rdms}})
             
+            results = res["results"]
             results['schema'] = SCHEMA_VERSION + '-energy_calc'
             with open('energycalc-results.json', 'w') as f:
               f.write(json.dumps(results, indent=2))
             
             if {{inputs.parameters.save-hamiltonian}}:
-              save_interaction_operator(hamiltonian, 'hamiltonian.json')
+              hamiltonian = res.get('hamiltonian', None)
+              if hamiltonian is not None:
+                  save_interaction_operator(hamiltonian, "hamiltonian.json")
+
+            if {{inputs.parameters.save-rdms}}:
+              rdms = res.get('rdms', None)
+              if rdms is not None:
+                  save_interaction_rdm(rdms, "rdms.json")
             
             with open('n_alpha.txt', 'w') as f:
               f.write(str(results['n_alpha']))
