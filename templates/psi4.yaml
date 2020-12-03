@@ -30,7 +30,7 @@ spec:
       - name: options
         default: None
       - name: save-rdms
-        default: False
+        default: 'False'
       - name: command
         value: bash main_script.sh
       artifacts:
@@ -70,7 +70,7 @@ spec:
                      n_active_extract={{inputs.parameters.n-active-extract}},
                      n_occupied_extract={{inputs.parameters.n-occupied-extract}},
                      freeze_core_extract={{inputs.parameters.freeze-core-extract}},
-                     save_rdms = {{inputs.parameters.save-rdms}})
+                     save_rdms={{inputs.parameters.save-rdms}})
             
             results['schema'] = SCHEMA_VERSION + '-energy_calc'
             with open('energycalc-results.json', 'w') as f:
