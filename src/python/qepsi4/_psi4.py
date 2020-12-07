@@ -140,8 +140,9 @@ def run_psi4(
     if save_rdms and not method in ["fci", "cis", "cisd", "cisdt", "cisdtq"]:
         print(f"run_psi4 was called with method={method}")
         warnings.warn(
-            "RDM calculation can only be performed for Configuration Interaction methods. save_rdms option will be ignored."
+            "RDM calculation can only be performed for Configuration Interaction methods. save_rdms option will be set to False."
         )
+        save_rdms = False
 
     geometry_str = f"{charge} {multiplicity}\n"
     for atom in geometry["sites"]:
