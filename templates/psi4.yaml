@@ -106,6 +106,9 @@ spec:
       - name: hamiltonian
         path: /app/hamiltonian.json
         optional: True
+      - name: rdms
+        path: /app/rdms.json
+        optional: True
       parameters:
       - name: n-alpha
         valueFrom:
