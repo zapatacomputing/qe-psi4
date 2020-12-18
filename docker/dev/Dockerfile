@@ -31,9 +31,6 @@ RUN conda update psi4 -c psi4/label/dev
 RUN apt-get install -y libopenblas-base
 RUN apt-get install -y python3-dev build-essential
 
-# SHELL ["conda", "run", "-n", "psi4-dev", "/bin/bash", "-c"]
-
-
 RUN ["conda", "run", "-n", "psi4-dev", "pip", "install", "pybind11"]
 RUN ["conda", "run", "-n", "psi4-dev", "pip", "install", \
         "matplotlib", \
@@ -42,16 +39,9 @@ RUN ["conda", "run", "-n", "psi4-dev", "pip", "install", \
         "opt_einsum", \
         "adcc", \
         "h5py"]
-# RUN pip install pybind11
-# RUN pip install matplotlib \
-#                 scipy \
-#                 pandas \
-#                 opt_einsum \
-#                 adcc \
-#                 h5py
 
-# Install Orquestra runtime dependencies
-# RUN pip install pyyaml==5.1
+RUN conda init bash
+RUN echo "conda activate psi4-dev" >> /root/.bashrc
 
 WORKDIR /app
 
