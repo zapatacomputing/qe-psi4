@@ -215,6 +215,12 @@ def run_psi4(
         "n_frozen_valence": wavefunction.frzvpi().sum(),
     }
 
+    results["scalar_variables"] = wavefunction.scalar_variables()
+
+    results["array_variables"] = {}
+    for variable_name, value in wavefunction.array_variables().items():
+        results["array_variables"][variable_name] = value.to_array().tolist()
+
     hamiltonian = None
     if save_hamiltonian:
         mints = psi4.core.MintsHelper(wavefunction.basisset())
