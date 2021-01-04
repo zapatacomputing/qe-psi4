@@ -14,15 +14,13 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/zapatacomputing/qe-psi4",
-    packages=['qepsi4'],
-    package_dir={'' : 'python'},
+    packages=["qepsi4"],
+    package_dir={"": "python"},
     classifiers=(
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
     ),
     install_requires=[
-        'z-quantum-core',
-        'qe-openfermion'
-    ]
-
+        "z-quantum-core",
+    ],
 )
