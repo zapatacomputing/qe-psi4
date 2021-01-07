@@ -31,7 +31,8 @@ def run_psi4(
     if options == "None":
         options = None
     else:
-        options = json.loads(options)
+        if isinstance(options, str):
+            options = json.loads(options)
     if wavefunction == "None":
         wavefunction = None
 
