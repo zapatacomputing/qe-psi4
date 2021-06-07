@@ -17,6 +17,8 @@ on:
 jobs:
   # This workflow contains a single job called "build"
   build:
+    container:
+      image: zapatacomputing/qe-psi4:latest
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
