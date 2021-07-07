@@ -3,38 +3,28 @@
 FROM ubuntu
 WORKDIR /app
 USER root
-RUN apt-get update --ignore-missing
+
+ARG PSI4_VERSION="Psi4conda-1.4rc2-py37-Linux-x86_64"
 
 # Install python, pip, and other utilities
-RUN yes | apt-get install wget
-RUN yes | apt-get install git
-RUN yes | apt-get install python3
-RUN yes | apt-get install python3-pip
-RUN yes | apt-get install vim
-RUN apt-get -y install htop
-
-# Install development stuff. Not sure if all of these things are necessary.
-RUN yes | apt-get install gcc
-RUN yes | apt-get install g++
-RUN yes | apt-get install python-dev
+RUN apt-get update --ignore-missing && \
+    apt-get install wget git python3 python3-pip python-dev vim htop curl
 
 # Install Psi4
-RUN apt-get install -y curl
 WORKDIR /root
-RUN curl "http://vergil.chemistry.gatech.edu/psicode-download/Psi4conda-1.3.2-py37-Linux-x86_64.sh" -o Psi4conda-1.3.2-py37-Linux-x86_64.sh --keepalive-time 2
-RUN bash Psi4conda-1.3.2-py37-Linux-x86_64.sh -b -p $HOME/psi4conda
-RUN echo '. $HOME/psi4conda/etc/profile.d/conda.sh' >> ~/.bashrc
-RUN echo 'conda activate' >> ~/.bashrc
-RUN rm /root/Psi4conda-1.3.2-py37-Linux-x86_64.sh
+RUN curl "http://vergil.chemistry.gatech.edu/psicode-download/${PSI4_VERSION}.sh" -o ${PSI4_VERSION}.sh --keepalive-time 2 && \
+    bash ${PSI4_VERSION}.sh -b -p $HOME/psi4conda && \
+    echo ". $HOME/psi4conda/etc/profile.d/conda.sh\nconda activate" >> ~/.bashrc && \ 
+    rm /root/${PSI4_VERSION}.sh
 
 ENV PATH="/root/psi4conda/bin:${PATH}"
 ENV PYTHONPATH="/usr/local/lib/python3.7/dist-packages:${PYTHONPATH}"
 
 RUN python3 -m pip install scipy==1.2.2 \
-                           numpy==1.15.4 \
-                           openfermion==0.10.0 \
-                           pyyaml==5.1 \
-                           python-rapidjson==0.9.1
+    numpy==1.15.4 \
+    openfermion==0.10.0 \
+    pyyaml==5.1 \
+    python-rapidjson==0.9.1
 
 WORKDIR /app
 
