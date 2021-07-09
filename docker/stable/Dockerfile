@@ -8,7 +8,7 @@ ARG PSI4_VERSION="Psi4conda-1.3.2-py37-Linux-x86_64"
 
 # Install python, pip, and other utilities
 RUN apt-get update -y --ignore-missing && \
-    apt-get install -y curl
+    apt-get install -y curl git
 
 # Install Psi4
 RUN curl "http://vergil.chemistry.gatech.edu/psicode-download/${PSI4_VERSION}.sh" -o /root/${PSI4_VERSION}.sh --keepalive-time 2 && \
