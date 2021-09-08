@@ -105,6 +105,8 @@ def run_psi4(
     n_occupied_extract: int = None,
     freeze_core_extract: bool = False,
     save_rdms: bool = False,
+    output_filename: str = None,
+    return_wfn: bool = False,
 ):
     """Generate an input file in the Psi4 python domain-specific language for
     a molecule.
@@ -129,6 +131,8 @@ def run_psi4(
             doubly occupied in the saved Hamiltonian. Ignored if
             n_occupied_extract is not None.
         save_rdms: If True, save 1- and 2-RDMs
+        output_filename: If not None, then saves output file
+        return_wfn : If True, returns results_dict and wavefunction
 
     Returns:
         results_dict: Python dictionary with the results of the calculation (dict), Hamiltonian
@@ -163,6 +167,10 @@ def run_psi4(
     if options:
         combined_options.update(options)
     psi4.set_options(combined_options)
+
+    # Save psi4 output if file is named
+    if output_filename is not None:
+        psi4.core.set_output_file('{0}.dat'.format(output_filename), False)
 
     # Create a fake wave function and use it to select the active space based on the input parameters
     fake_wfn = psi4.core.Wavefunction.build(
@@ -234,7 +242,11 @@ def run_psi4(
     psi4.core.clean()
     psi4.core.clean_options()
     psi4.core.clean_variables()
-    return results_dict
+
+    if not return_wfn:
+        return results_dict
+    else: 
+        return results_dict, wavefunction
 
 
 def get_ham_from_psi4(
