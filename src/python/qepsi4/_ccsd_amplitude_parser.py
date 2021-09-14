@@ -1,6 +1,6 @@
 ############################################################################
-#   Copyright 2021 Google LLC
-#   Modified by Zapata Computing 2021 for compatibility reasons.
+#   Copyright 2017 The OpenFermion Developers
+#   Modifications copyright 2021 Zapata Computing, Inc. for compatibility reasons.
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
