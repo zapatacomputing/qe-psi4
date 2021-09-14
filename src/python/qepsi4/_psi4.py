@@ -10,6 +10,165 @@ from openfermion.config import EQ_TOLERANCE
 import warnings
 
 
+def run_psi4(
+    geometry: dict,
+    basis: str = "STO-3G",
+    multiplicity: int = 1,
+    charge: int = 0,
+    method: str = "scf",
+    reference: str = "rhf",
+    freeze_core: bool = False,
+    save_hamiltonian: bool = False,
+    options: dict = None,
+    n_active_extract: int = None,
+    n_occupied_extract: int = None,
+    freeze_core_extract: bool = False,
+    save_rdms: bool = False,
+    output_filename: str = None,
+    return_wfn: bool = False,
+):
+    """Generate an input file in the Psi4 python domain-specific language for
+    a molecule.
+
+    Args:
+        geometry: a dictionary containing the molecule geometry.
+        basis: which basis set to use
+        multiplicity: spin multiplicity
+        charge: charge of the molecule
+        method: which calculation method to use
+        reference: which reference wavefunction to use. fno- energy methods are only compatible with RHF
+        freeze_core: Whether to freeze occupied core orbitals
+        save_hamiltonian: whether to save the Hamiltonian to a file. If True, symmetry will be disabled.
+        options: additional commands to be passed to Psi4
+        n_active_extract: number of molecular orbitals to include in the
+            saved Hamiltonian. If None, includes all orbitals.
+        n_occupied_extract: number of occupied molecular orbitals to
+            include in the saved Hamiltonian. Must be less than or equal to
+            n_active_extract. If None, all occupied orbitals are included,
+            except the core orbitals if freeze_core_extract is set to True.
+        freeze_core_extract: If True, frozen core orbitals will always be
+            doubly occupied in the saved Hamiltonian. Ignored if
+            n_occupied_extract is not None.
+        save_rdms: If True, save 1- and 2-RDMs
+        output_filename: If not None, then saves output file
+        return_wfn : If True, returns results_dict and wavefunction
+
+    Returns:
+        results_dict: Python dictionary with the results of the calculation (dict), Hamiltonian
+            (openfermion.ops.InteractionOperator), and 1- and 2-RDMs (openfermion.op.InteractionRDM)
+    """
+
+    if save_rdms and not method in ["fci", "cis", "cisd", "cisdt", "cisdtq"]:
+        print(f"run_psi4 was called with method={method}")
+        warnings.warn(
+            "RDM calculation can only be performed for Configuration Interaction methods. save_rdms option will be set to False."
+        )
+        save_rdms = False
+
+    geometry_str = f"{charge} {multiplicity}\n"
+    for atom in geometry["sites"]:
+        geometry_str += "{} {} {} {}\n".format(
+            atom["species"], atom["x"], atom["y"], atom["z"]
+        )
+
+    geometry_str += "\nunits angstrom\n"
+    c1_sym = save_hamiltonian or save_rdms
+    if c1_sym:
+        geometry_str += "symmetry c1\n"
+
+    molecule = psi4.geometry(geometry_str)
+
+    combined_options = {
+        "reference": reference,
+        "basis": basis,
+        "freeze_core": freeze_core,
+    }
+    if options:
+        combined_options.update(options)
+    psi4.set_options(combined_options)
+
+    # Save psi4 output if file is named
+    if output_filename is not None:
+        psi4.core.set_output_file("{0}.dat".format(output_filename), False)
+
+    # Create a fake wave function and use it to select the active space based on the input parameters
+    fake_wfn = psi4.core.Wavefunction.build(
+        molecule, psi4.core.get_global_option("basis")
+    )
+    ndocc, nact, n_frozen_vir = select_active_space(
+        molecule,
+        fake_wfn,
+        n_active_extract=n_active_extract,
+        n_occupied_extract=n_occupied_extract,
+        freeze_core_extract=freeze_core_extract,
+    )
+
+    if ndocc != 0:
+        psi4.set_options({"num_frozen_docc": ndocc})
+    if n_frozen_vir != 0:
+        assert (
+            molecule.point_group().symbol() == "c1"
+        )  # otherwise frozen_uocc should be an array specifying number of orbitals per irrep
+        psi4.set_options({"frozen_uocc": [n_frozen_vir]})
+
+    if (
+        method == "fci"
+        or method == "cis"
+        or method == "cisd"
+        or method == "cisdt"
+        or method == "cisdtq"
+    ):
+        psi4.set_options({"qc_module": "detci"})
+        if save_rdms:
+            psi4.set_options({"opdm": True, "tpdm": True})
+
+    energy, wavefunction = psi4.energy(method, return_wfn=True)
+
+    # Perform a sanity check to make sure that the active space was selected correctly
+    assert wavefunction.nmo() == (ndocc + nact + n_frozen_vir)
+    # if method != 'scf':
+    #    assert wavefunction.fzvpi().sum() == nvir
+
+    results_dict = {}
+
+    results = {
+        "energy": energy,
+        "n_alpha": wavefunction.nalpha(),
+        "n_beta": wavefunction.nbeta(),
+        "n_mo": wavefunction.nmo(),
+        "n_frozen_core": wavefunction.nfrzc(),
+        "n_frozen_valence": wavefunction.frzvpi().sum(),
+    }
+
+    hamiltonian = None
+    if save_hamiltonian:
+        mints = psi4.core.MintsHelper(wavefunction.basisset())
+        hamiltonian = get_ham_from_psi4(
+            wavefunction,
+            mints,
+            ndocc=ndocc,
+            nact=nact,
+            nuclear_repulsion_energy=molecule.nuclear_repulsion_energy(),
+        )
+
+    rdm = None
+    if save_rdms:
+        rdm = get_rdms_from_psi4(wavefunction, ndocc=ndocc, nact=nact)
+
+    results_dict["hamiltonian"] = hamiltonian
+    results_dict["rdms"] = rdm
+    results_dict["results"] = results
+
+    psi4.core.clean()
+    psi4.core.clean_options()
+    psi4.core.clean_variables()
+
+    if not return_wfn:
+        return results_dict
+    else:
+        return results_dict, wavefunction
+
+
 def select_active_space(
     mol, wfn, n_active_extract=None, n_occupied_extract=None, freeze_core_extract=False
 ):
@@ -91,170 +250,8 @@ def select_active_space(
     return n_core_extract, n_active_extract, n_frozen_virtuals
 
 
-def run_psi4(
-    geometry: dict,
-    basis: str = "STO-3G",
-    multiplicity: int = 1,
-    charge: int = 0,
-    method: str = "scf",
-    reference: str = "rhf",
-    freeze_core: bool = False,
-    save_hamiltonian: bool = False,
-    options: dict = None,
-    n_active_extract: int = None,
-    n_occupied_extract: int = None,
-    freeze_core_extract: bool = False,
-    save_rdms: bool = False,
-    output_filename: str = None,
-    return_wfn: bool = False,
-):
-    """Generate an input file in the Psi4 python domain-specific language for
-    a molecule.
-
-    Args:
-        geometry: a dictionary containing the molecule geometry.
-        basis: which basis set to use
-        multiplicity: spin multiplicity
-        charge: charge of the molecule
-        method: which calculation method to use
-        reference: which reference wavefunction to use. fno- energy methods are only compatible with RHF
-        freeze_core: Whether to freeze occupied core orbitals
-        save_hamiltonian: whether to save the Hamiltonian to a file. If True, symmetry will be disabled.
-        options: additional commands to be passed to Psi4
-        n_active_extract: number of molecular orbitals to include in the
-            saved Hamiltonian. If None, includes all orbitals.
-        n_occupied_extract: number of occupied molecular orbitals to
-            include in the saved Hamiltonian. Must be less than or equal to
-            n_active_extract. If None, all occupied orbitals are included,
-            except the core orbitals if freeze_core_extract is set to True.
-        freeze_core_extract: If True, frozen core orbitals will always be
-            doubly occupied in the saved Hamiltonian. Ignored if
-            n_occupied_extract is not None.
-        save_rdms: If True, save 1- and 2-RDMs
-        output_filename: If not None, then saves output file
-        return_wfn : If True, returns results_dict and wavefunction
-
-    Returns:
-        results_dict: Python dictionary with the results of the calculation (dict), Hamiltonian
-            (openfermion.ops.InteractionOperator), and 1- and 2-RDMs (openfermion.op.InteractionRDM)
-    """
-
-    if save_rdms and not method in ["fci", "cis", "cisd", "cisdt", "cisdtq"]:
-        print(f"run_psi4 was called with method={method}")
-        warnings.warn(
-            "RDM calculation can only be performed for Configuration Interaction methods. save_rdms option will be set to False."
-        )
-        save_rdms = False
-
-    geometry_str = f"{charge} {multiplicity}\n"
-    for atom in geometry["sites"]:
-        geometry_str += "{} {} {} {}\n".format(
-            atom["species"], atom["x"], atom["y"], atom["z"]
-        )
-
-    geometry_str += "\nunits angstrom\n"
-    c1_sym = save_hamiltonian or save_rdms
-    if c1_sym:
-        geometry_str += "symmetry c1\n"
-
-    molecule = psi4.geometry(geometry_str)
-
-    combined_options = {
-        "reference": reference,
-        "basis": basis,
-        "freeze_core": freeze_core,
-    }
-    if options:
-        combined_options.update(options)
-    psi4.set_options(combined_options)
-
-    # Save psi4 output if file is named
-    if output_filename is not None:
-        psi4.core.set_output_file('{0}.dat'.format(output_filename), False)
-
-    # Create a fake wave function and use it to select the active space based on the input parameters
-    fake_wfn = psi4.core.Wavefunction.build(
-        molecule, psi4.core.get_global_option("basis")
-    )
-    ndocc, nact, n_frozen_vir = select_active_space(
-        molecule,
-        fake_wfn,
-        n_active_extract=n_active_extract,
-        n_occupied_extract=n_occupied_extract,
-        freeze_core_extract=freeze_core_extract,
-    )
-
-    if ndocc != 0:
-        psi4.set_options({"num_frozen_docc": ndocc})
-    if n_frozen_vir != 0:
-        assert (
-            molecule.point_group().symbol() == "c1"
-        )  # otherwise frozen_uocc should be an array specifying number of orbitals per irrep
-        psi4.set_options({"frozen_uocc": [n_frozen_vir]})
-
-    if (
-        method == "fci"
-        or method == "cis"
-        or method == "cisd"
-        or method == "cisdt"
-        or method == "cisdtq"
-    ):
-        psi4.set_options({"qc_module": "detci"})
-        if save_rdms:
-            psi4.set_options({"opdm": True, "tpdm": True})
-
-    energy, wavefunction = psi4.energy(method, return_wfn=True)
-
-    # Perform a sanity check to make sure that the active space was selected correctly
-    assert wavefunction.nmo() == (ndocc + nact + n_frozen_vir)
-    # if method != 'scf':
-    #    assert wavefunction.fzvpi().sum() == nvir
-
-    results_dict = {}
-
-    results = {
-        "energy": energy,
-        "n_alpha": wavefunction.nalpha(),
-        "n_beta": wavefunction.nbeta(),
-        "n_mo": wavefunction.nmo(),
-        "n_frozen_core": wavefunction.nfrzc(),
-        "n_frozen_valence": wavefunction.frzvpi().sum(),
-    }
-
-    hamiltonian = None
-    if save_hamiltonian:
-        mints = psi4.core.MintsHelper(wavefunction.basisset())
-        hamiltonian = get_ham_from_psi4(
-            wavefunction,
-            mints,
-            ndocc=ndocc,
-            nact=nact,
-            nuclear_repulsion_energy=molecule.nuclear_repulsion_energy(),
-        )
-
-    rdm = None
-    if save_rdms:
-        rdm = get_rdms_from_psi4(wavefunction, ndocc=ndocc, nact=nact)
-
-    results_dict["results"] = results
-    results_dict["hamiltonian"] = hamiltonian
-    results_dict["rdms"] = rdm
-    psi4.core.clean()
-    psi4.core.clean_options()
-    psi4.core.clean_variables()
-
-    if not return_wfn:
-        return results_dict
-    else: 
-        return results_dict, wavefunction
-
-
 def get_ham_from_psi4(
-    wfn,
-    mints,
-    ndocc=None,
-    nact=None,
-    nuclear_repulsion_energy=0,
+    wfn, mints, ndocc=None, nact=None, nuclear_repulsion_energy=0,
 ):
     """Get a molecular Hamiltonian from a Psi4 calculation.
 
