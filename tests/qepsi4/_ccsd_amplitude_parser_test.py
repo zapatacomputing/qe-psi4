@@ -21,41 +21,36 @@ def get_expected_fop():
 def test_h2_ccsd_amplitudes_parsed_correctly():
     basis = "6-31g"
 
-    bond_lengths = [0.2]
-
-    method = "ccsd"
     options = {"mp2_amps_print": True, "num_amps_print": 100}
 
     output_filename = "h2_sto3g"
 
-    for bond_length in bond_lengths:
+    hydrogen_geometry = {
+        "sites": [
+            {"species": "H", "x": 0, "y": 0, "z": 0},
+            {"species": "H", "x": 0, "y": 0, "z": 0.2},
+        ]
+    }
 
-        hydrogen_geometry = {
-            "sites": [
-                {"species": "H", "x": 0, "y": 0, "z": 0},
-                {"species": "H", "x": 0, "y": 0, "z": bond_length},
-            ]
-        }
+    out = run_psi4(
+        geometry=hydrogen_geometry,
+        basis=basis,
+        multiplicity=1,
+        charge=0,
+        method="ccsd",
+        reference="rhf",
+        freeze_core=False,
+        save_hamiltonian=True,
+        options=options,
+        n_active_extract=None,
+        n_occupied_extract=None,
+        freeze_core_extract=False,
+        save_rdms=False,
+        output_filename=output_filename,
+        return_wfn=True,
+    )
 
-        out = run_psi4(
-            geometry=hydrogen_geometry,
-            basis=basis,
-            multiplicity=1,
-            charge=0,
-            method=method,
-            reference="rhf",
-            freeze_core=False,
-            save_hamiltonian=True,
-            options=options,
-            n_active_extract=None,
-            n_occupied_extract=None,
-            freeze_core_extract=False,
-            save_rdms=False,
-            output_filename=output_filename,
-            return_wfn=True,
-        )
-
-        _, wfn = out
+    _, wfn = out
 
     given_fop = parse_amplitudes_from_psi4_ccsd(
         wfn=wfn,

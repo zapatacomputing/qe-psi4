@@ -18,7 +18,7 @@
 import numpy as np
 from openfermion import FermionOperator
 
-
+# Original function: https://github.com/quantumlib/OpenFermion-Psi4/blob/master/openfermionpsi4/_psi4_conversion_functions.py#L97
 def parse_amplitudes_from_psi4_ccsd(
     wfn,
     psi_filename,
