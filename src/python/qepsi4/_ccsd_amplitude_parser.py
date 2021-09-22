@@ -40,7 +40,7 @@ def parse_amplitudes_from_psi4_ccsd(
       freeze_core (bool): Must be True if the wavefunction wfn contains frozen
                           core orbitals, otherwise amplitudes are not extracted
                           correctly.
-      get_mp2_amplitudes (bool): whether to get the mp2 initial amplitudes instead 
+      get_mp2_amplitudes (bool): whether to get the mp2 initial amplitudes instead
         of the CCSD amplitudes.
       n_frozen_amplitudes (int): number of molecular core orbitals to exclude in
         the saved amplitudes. If None, includes all occupied orbitals. Requires
@@ -116,7 +116,7 @@ def parse_amplitudes_from_psi4_ccsd(
             elif "Largest TIjAb Amplitudes:" in line:
                 T2IjAb_index = i
 
-        elif i > ccsd_line:
+        elif i > ccsd_line and not get_mp2_amplitudes:
 
             if "Largest TIA Amplitudes:" in line:
                 T1IA_index = i
@@ -142,13 +142,13 @@ def parse_amplitudes_from_psi4_ccsd(
     # system is given by the active window
 
     def alpha_occupied(i):
-        return 2 * i - n_frozen_amplitudes
+        return 2 * (i - n_frozen_amplitudes)
 
     def alpha_unoccupied(i):
         return 2 * (i + n_alpha_electrons)
 
     def beta_occupied(i):
-        return 2 * i + 1 - n_frozen_amplitudes
+        return 2 * (i - n_frozen_amplitudes) + 1
 
     def beta_unoccupied(i):
         return 2 * (i + n_beta_electrons) + 1
@@ -159,8 +159,11 @@ def parse_amplitudes_from_psi4_ccsd(
 
     # Read T1's
 
+    end_read = len(output_buffer)
     if get_mp2_amplitudes:
 
+        # Make sure we stop reading before CCSD amplitudes
+        end_read = ccsd_line
         # generate all possible singlet excitations
 
         # for i in range(int(n_frozen_amplitudes), n_alpha_electrons):
@@ -175,7 +178,7 @@ def parse_amplitudes_from_psi4_ccsd(
 
         # read single excitations
         if T1IA_index is not None:
-            for line in output_buffer[T1IA_index + 1 :]:
+            for line in output_buffer[T1IA_index + 1 : end_read]:
                 ivals = line.split()
                 if not ivals:
                     break
@@ -194,7 +197,7 @@ def parse_amplitudes_from_psi4_ccsd(
                         single_amps.append([op, float(ivals[2])])
 
         if T1ia_index is not None:
-            for line in output_buffer[T1ia_index + 1 :]:
+            for line in output_buffer[T1ia_index + 1 : end_read]:
                 ivals = line.split()
                 if not ivals:
                     break
@@ -206,7 +209,7 @@ def parse_amplitudes_from_psi4_ccsd(
 
     # Read T2's
     if T2IJAB_index is not None:
-        for line in output_buffer[T2IJAB_index + 1 :]:
+        for line in output_buffer[T2IJAB_index + 1 : end_read]:
             ivals = line.split()
             if not ivals:
                 break
@@ -229,7 +232,7 @@ def parse_amplitudes_from_psi4_ccsd(
                     double_amps.append([op, float(ivals[4]) / 2.0])
 
     if T2ijab_index is not None:
-        for line in output_buffer[T2ijab_index + 1 :]:
+        for line in output_buffer[T2ijab_index + 1 : end_read]:
             ivals = line.split()
             if not ivals:
                 break
@@ -243,7 +246,7 @@ def parse_amplitudes_from_psi4_ccsd(
                 double_amps.append([op, float(ivals[4]) / 2.0])
 
     if T2IjAb_index is not None:
-        for line in output_buffer[T2IjAb_index + 1 :]:
+        for line in output_buffer[T2IjAb_index + 1 : end_read]:
             ivals = line.split()
             # print("ivals:", ivals)
             if not ivals:
