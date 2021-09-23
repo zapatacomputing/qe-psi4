@@ -15,6 +15,7 @@
 #   limitations under the License.
 ############################################################################
 
+from typing import Callable, Dict, List
 import numpy as np
 from openfermion import FermionOperator
 
@@ -49,10 +50,12 @@ def parse_amplitudes_from_psi4_ccsd(
       molecule(InteractionOperator): Molecular Operator instance holding ccsd
         amplitudes
     """
+    output_buffer = [line for line in open(psi_filename)]
+    end_read = len(output_buffer)
+
     # the reasoning here is that where freeze_core = True
     # the Psi4 CCSD routine reset the orbitals number
     # making the first active 0, when printing the amplitudes
-
     if freeze_core:
         n_frozen_so = 2 * wfn.nfrzc()
         n_frozen = wfn.nfrzc()
@@ -77,13 +80,6 @@ def parse_amplitudes_from_psi4_ccsd(
     n_beta_electrons = wfn.nbeta() - n_frozen
 
     # prepare buffer with output info
-    output_buffer = [line for line in open(psi_filename)]
-
-    T1IA_index = None
-    T1ia_index = None
-    T2IJAB_index = None
-    T2ijab_index = None
-    T2IjAb_index = None
 
     # Find Start Indices
     if get_mp2_amplitudes:
@@ -91,47 +87,21 @@ def parse_amplitudes_from_psi4_ccsd(
             if "MP2 correlation energy" in line:
                 mp2_line = i
                 break
+    else:
+        mp2_line = None
 
     for i, line in enumerate(output_buffer):
         if "Solving CC Amplitude Equations" in line:
             ccsd_line = i
             break
 
-    for i, line in enumerate(output_buffer):
-
-        if get_mp2_amplitudes and i > mp2_line and i < ccsd_line:
-
-            if "Largest TIA Amplitudes:" in line:
-                T1IA_index = i
-
-            elif "Largest Tia Amplitudes:" in line:
-                T1ia_index = i
-
-            elif "Largest TIJAB Amplitudes:" in line:
-                T2IJAB_index = i
-
-            elif "Largest Tijab Amplitudes:" in line:
-                T2ijab_index = i
-
-            elif "Largest TIjAb Amplitudes:" in line:
-                T2IjAb_index = i
-
-        elif i > ccsd_line and not get_mp2_amplitudes:
-
-            if "Largest TIA Amplitudes:" in line:
-                T1IA_index = i
-
-            elif "Largest Tia Amplitudes:" in line:
-                T1ia_index = i
-
-            elif "Largest TIJAB Amplitudes:" in line:
-                T2IJAB_index = i
-
-            elif "Largest Tijab Amplitudes:" in line:
-                T2ijab_index = i
-
-            elif "Largest TIjAb Amplitudes:" in line:
-                T2IjAb_index = i
+    (
+        T1IA_index,
+        T1ia_index,
+        T2IJAB_index,
+        T2ijab_index,
+        T2IjAb_index,
+    ) = extract_T_indices(output_buffer, get_mp2_amplitudes, mp2_line, ccsd_line)
 
     # Determine if calculation is restricted / closed shell or otherwise
     restricted = T1ia_index is None and T2ijab_index is None
@@ -140,7 +110,6 @@ def parse_amplitudes_from_psi4_ccsd(
     # the number of frozen orbitals determine the zero index (frozen
     # orbitals become negative, then excluded). Then the extend of the
     # system is given by the active window
-
     def alpha_occupied(i):
         return 2 * (i - n_frozen_amplitudes)
 
@@ -158,16 +127,11 @@ def parse_amplitudes_from_psi4_ccsd(
     double_amps = []
 
     # Read T1's
-
-    end_read = len(output_buffer)
     if get_mp2_amplitudes:
-
         # Make sure we stop reading before CCSD amplitudes
         end_read = ccsd_line
-        # generate all possible singlet excitations
 
-        # for i in range(int(n_frozen_amplitudes), n_alpha_electrons):
-        #    for a in range(int(n_spin_orbitals/2 - n_alpha_electrons)):
+        # generate all possible singlet excitations
         for i in range(n_alpha_electrons - 1, n_alpha_electrons):
             for a in range(1):
                 single_amps.append([[alpha_unoccupied(a), alpha_occupied(i)], 0.0])
@@ -175,101 +139,65 @@ def parse_amplitudes_from_psi4_ccsd(
                 single_amps.append([[beta_unoccupied(a), beta_occupied(i)], 0.0])
 
     else:
-
         # read single excitations
         if T1IA_index is not None:
-            for line in output_buffer[T1IA_index + 1 : end_read]:
-                ivals = line.split()
-                if not ivals:
-                    break
+            ret = extract_amplitudes_from_T1_lines(
+                output_buffer[T1IA_index + 1 : end_read],
+                n_spin_orbitals,
+                restricted,
+                fn_list=[alpha_unoccupied, alpha_occupied],
+                restricted_fn_list=[beta_unoccupied, beta_occupied],
+            )
 
-                op = [alpha_unoccupied(int(ivals[1])), alpha_occupied(int(ivals[0]))]
-                if np.prod(np.array(op) < n_spin_orbitals) and np.prod(
-                    np.array(op) >= 0
-                ):
-                    single_amps.append([op, float(ivals[2])])
-
-                    if restricted:
-                        op = [
-                            beta_unoccupied(int(ivals[1])),
-                            beta_occupied(int(ivals[0])),
-                        ]
-                        single_amps.append([op, float(ivals[2])])
+            single_amps.extend(ret)
 
         if T1ia_index is not None:
-            for line in output_buffer[T1ia_index + 1 : end_read]:
-                ivals = line.split()
-                if not ivals:
-                    break
-                op = [beta_unoccupied(int(ivals[1])), beta_occupied(int(ivals[0]))]
-                if np.prod(np.array(op) < n_spin_orbitals) and np.prod(
-                    np.array(op) >= 0
-                ):
-                    single_amps.append([op, float(ivals[2])])
+            ret = extract_amplitudes_from_T1_lines(
+                output_buffer[T1IA_index + 1 : end_read],
+                n_spin_orbitals,
+                restricted,
+                fn_list=[beta_unoccupied, beta_occupied],
+            )
+
+            single_amps.extend(ret)
 
     # Read T2's
     if T2IJAB_index is not None:
-        for line in output_buffer[T2IJAB_index + 1 : end_read]:
-            ivals = line.split()
-            if not ivals:
-                break
-            op = [
-                alpha_unoccupied(int(ivals[2])),
-                alpha_occupied(int(ivals[0])),
-                alpha_unoccupied(int(ivals[3])),
-                alpha_occupied(int(ivals[1])),
-            ]
-            if np.prod(np.array(op) < n_spin_orbitals) and np.prod(np.array(op) >= 0):
-                double_amps.append([op, float(ivals[4]) / 2.0])
+        ret = extract_amplitudes_from_T1_lines(
+            output_buffer[T2IJAB_index + 1 : end_read],
+            n_spin_orbitals,
+            restricted,
+            fn_list=[alpha_unoccupied, alpha_occupied] * 2,
+            restricted_fn_list=[beta_unoccupied, beta_occupied] * 2,
+        )
 
-                if restricted:
-                    op = [
-                        beta_unoccupied(int(ivals[2])),
-                        beta_occupied(int(ivals[0])),
-                        beta_unoccupied(int(ivals[3])),
-                        beta_occupied(int(ivals[1])),
-                    ]
-                    double_amps.append([op, float(ivals[4]) / 2.0])
+        double_amps.extend(ret)
 
     if T2ijab_index is not None:
-        for line in output_buffer[T2ijab_index + 1 : end_read]:
-            ivals = line.split()
-            if not ivals:
-                break
-            op = [
-                beta_unoccupied(int(ivals[2])),
-                beta_occupied(int(ivals[0])),
-                beta_unoccupied(int(ivals[3])),
-                beta_occupied(int(ivals[1])),
-            ]
-            if np.prod(np.array(op) < n_spin_orbitals) and np.prod(np.array(op) >= 0):
-                double_amps.append([op, float(ivals[4]) / 2.0])
+        ret = extract_amplitudes_from_T1_lines(
+            output_buffer[T2ijab_index + 1 : end_read],
+            n_spin_orbitals,
+            restricted,
+            fn_list=[beta_unoccupied, beta_occupied] * 2,
+        )
+
+        double_amps.extend(ret)
 
     if T2IjAb_index is not None:
-        for line in output_buffer[T2IjAb_index + 1 : end_read]:
-            ivals = line.split()
-            # print("ivals:", ivals)
-            if not ivals:
-                break
-            op = [
-                alpha_unoccupied(int(ivals[2])),
-                alpha_occupied(int(ivals[0])),
-                beta_unoccupied(int(ivals[3])),
-                beta_occupied(int(ivals[1])),
-            ]
-            # print("check 1:", op, np.array(op)<n_spin_orbitals)
-            # print("check 2:", np.array(op)>=0)
-            if np.prod(np.array(op) < n_spin_orbitals) and np.prod(np.array(op) >= 0):
-                double_amps.append([op, float(ivals[4]) / 2.0])
+        ret = extract_amplitudes_from_T1_lines(
+            output_buffer[T2IjAb_index + 1 : end_read],
+            n_spin_orbitals,
+            restricted,
+            fn_list=[alpha_unoccupied, alpha_occupied, beta_unoccupied, beta_occupied],
+            restricted_fn_list=[
+                beta_unoccupied,
+                beta_occupied,
+                alpha_unoccupied,
+                alpha_occupied,
+            ],
+        )
 
-                if restricted:
-                    op = [
-                        beta_unoccupied(int(ivals[2])),
-                        beta_occupied(int(ivals[0])),
-                        alpha_unoccupied(int(ivals[3])),
-                        alpha_occupied(int(ivals[1])),
-                    ]
-                    double_amps.append([op, float(ivals[4]) / 2.0])
+        double_amps.extend(ret)
 
     # sort amplitudes
     single_amps.sort(key=lambda x: abs(x[1]), reverse=True)
@@ -281,12 +209,12 @@ def parse_amplitudes_from_psi4_ccsd(
     single_ops = [x[0] for x in single_amps]
     double_ops = [x[0] for x in double_amps]
 
-    # Generate Fermion Operator
-
-    s_generator = FermionOperator()
-    d_generator = FermionOperator()
     print("single_ops", single_ops)
     print("double_ops", double_ops)
+
+    # Generate Fermion Operator
+    s_generator = FermionOperator()
+    d_generator = FermionOperator()
 
     # Add single excitations
     for n, [i, j] in enumerate(single_ops):
@@ -304,3 +232,77 @@ def parse_amplitudes_from_psi4_ccsd(
     fermion_generator = s_generator + d_generator
 
     return fermion_generator
+
+
+def extract_T_indices(output_buffer, get_mp2_amplitudes, mp2_line, ccsd_line):
+    T1IA_index = T1ia_index = T2IJAB_index = T2ijab_index = T2IjAb_index = None
+
+    is_reading = False
+    for i, line in enumerate(output_buffer):
+        if (get_mp2_amplitudes and i > mp2_line and i < ccsd_line) or (
+            i > ccsd_line and not get_mp2_amplitudes
+        ):
+            is_reading = True
+        else:
+            is_reading = False
+
+        if is_reading:
+            if "Largest TIA Amplitudes:" in line:
+                T1IA_index = i
+
+            elif "Largest Tia Amplitudes:" in line:
+                T1ia_index = i
+
+            elif "Largest TIJAB Amplitudes:" in line:
+                T2IJAB_index = i
+
+            elif "Largest Tijab Amplitudes:" in line:
+                T2ijab_index = i
+
+            elif "Largest TIjAb Amplitudes:" in line:
+                T2IjAb_index = i
+
+    return (
+        T1IA_index,
+        T1ia_index,
+        T2IJAB_index,
+        T2ijab_index,
+        T2IjAb_index,
+    )
+
+
+def functions_to_list(list_of_fn, list_of_params, ivals):
+    res = []
+    for fn, param in zip(list_of_fn, list_of_params):
+        res.append(fn(int(ivals[param])))
+
+    return res
+
+
+def extract_amplitudes_from_T1_lines(
+    buffer: List[str],
+    n_spin_orbitals: int,
+    restricted: bool,
+    fn_list: List[Callable],
+    restricted_fn_list: List[Callable] = None,
+):
+    ret = []
+
+    param_list = [1, 0] if len(fn_list) == 2 else [2, 0, 3, 1]
+
+    for line in buffer:
+        ivals = line.split()
+        if not ivals:
+            break
+
+        op = functions_to_list(fn_list, param_list, ivals)
+
+        if np.prod(np.array(op) < n_spin_orbitals) and np.prod(np.array(op) >= 0):
+            ret.append([op, float(ivals[len(fn_list)]) / float(len(fn_list) / 2)])
+
+            if restricted:
+                op = functions_to_list(restricted_fn_list, param_list, ivals)
+
+                ret.append([op, float(ivals[len(fn_list)]) / float(len(fn_list) / 2)])
+
+    return ret
