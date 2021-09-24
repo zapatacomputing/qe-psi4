@@ -1,6 +1,6 @@
 import os, json
 from qepsi4 import run_psi4 as _run_psi4
-from qeopenfermion import save_interaction_operator, save_interaction_rdm
+from zquantum.core.openfermion import save_interaction_operator, save_interaction_rdm
 from zquantum.core.utils import SCHEMA_VERSION
 
 
@@ -31,7 +31,8 @@ def run_psi4(
     if options == "None":
         options = None
     else:
-        options = json.loads(options)
+        if isinstance(options, str):
+            options = json.loads(options)
     if wavefunction == "None":
         wavefunction = None
 
@@ -54,16 +55,16 @@ def run_psi4(
         freeze_core_extract=freeze_core_extract,
     )
 
-    results = res['results']
+    results = res["results"]
     results["schema"] = SCHEMA_VERSION + "-energy_calc"
     with open("energycalc-results.json", "w") as f:
         f.write(json.dumps(results, indent=2))
 
-    hamiltonian = res.get('hamiltonian', None)
+    hamiltonian = res.get("hamiltonian", None)
     if hamiltonian is not None:
         save_interaction_operator(hamiltonian, "hamiltonian.json")
 
-    rdms = res.get('rdms', None)
+    rdms = res.get("rdms", None)
     if rdms is not None:
         save_interaction_rdm(rdms, "rdms.json")
 

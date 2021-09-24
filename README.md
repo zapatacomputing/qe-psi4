@@ -1,5 +1,7 @@
 # qe-psi4
 
+[![codecov](https://codecov.io/gh/zapatacomputing/qe-psi4/branch/master/graph/badge.svg?token=RLS534ON7W)](https://codecov.io/gh/zapatacomputing/qe-psi4)
+
 ## What is it?
 
 `qe-psi4` is an [Orquestra](https://www.orquestra.io) resource that allows workflows to use the [Psi4 library](http://www.psicode.org).

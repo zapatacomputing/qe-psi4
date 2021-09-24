@@ -2,20 +2,18 @@ import psi4
 from psi4 import qcel as qc  # QCelemental (https://github.com/MolSSI/QCElemental)
 import numpy as np
 from openfermion import (
-    InteractionOperator,
     general_basis_change,
     MolecularData,
     InteractionRDM,
 )
 from openfermion.config import EQ_TOLERANCE
-from typing import Tuple, Dict
 import warnings
 
 
 def select_active_space(
     mol, wfn, n_active_extract=None, n_occupied_extract=None, freeze_core_extract=False
 ):
-    """ Helper function to calculate the number of doubly occupied, active and virtual orbitals when extracting Hamiltonian/RDM 
+    """Helper function to calculate the number of doubly occupied, active and virtual orbitals when extracting Hamiltonian/RDM
     Args:
         mol (psi4.core.Molecule): Psi4 object containing information about the molecule
             including geometry, charge, symmetry and spin multiplicity
@@ -110,7 +108,7 @@ def run_psi4(
 ):
     """Generate an input file in the Psi4 python domain-specific language for
     a molecule.
-    
+
     Args:
         geometry: a dictionary containing the molecule geometry.
         basis: which basis set to use
@@ -131,7 +129,7 @@ def run_psi4(
             doubly occupied in the saved Hamiltonian. Ignored if
             n_occupied_extract is not None.
         save_rdms: If True, save 1- and 2-RDMs
-        
+
     Returns:
         results_dict: Python dictionary with the results of the calculation (dict), Hamiltonian
             (openfermion.ops.InteractionOperator), and 1- and 2-RDMs (openfermion.op.InteractionRDM)
@@ -246,7 +244,11 @@ def run_psi4(
 
 
 def get_ham_from_psi4(
-    wfn, mints, ndocc=None, nact=None, nuclear_repulsion_energy=0,
+    wfn,
+    mints,
+    ndocc=None,
+    nact=None,
+    nuclear_repulsion_energy=0,
 ):
     """Get a molecular Hamiltonian from a Psi4 calculation.
 
@@ -254,11 +256,11 @@ def get_ham_from_psi4(
         wfn (psi4.core.Wavefunction): Psi4 wavefunction object
         mints (psi4.core.MintsHelper): Psi4 molecular integrals helper
         ndocc (int): number of doubly occupied molecular orbitals to
-            include in the saved Hamiltonian. 
+            include in the saved Hamiltonian.
         nact (int): number of active molecular orbitals to include in the
-            saved Hamiltonian. 
+            saved Hamiltonian.
         nuclear_repulsion_energy (float): The ion-ion interaction energy.
-    
+
     Returns:
         hamiltonian (openfermion.ops.InteractionOperator): the electronic
             Hamiltonian.
@@ -346,12 +348,12 @@ def get_rdms_from_psi4(wfn, ndocc=None, nact=None):
     Args:
         wfn (psi4.core.Wavefunction): Psi4 wavefunction object
         ndocc (int): number of doubly occupied molecular orbitals to
-            exclude from the saved RDM. 
+            exclude from the saved RDM.
         nact (int): number of active molecular orbitals to include in the
-            saved RDM. 
+            saved RDM.
     Returns:
         rdm (openfermion.ops.InteractionRDM): an openfermion object storing
-            1- and 2-RDMs. 
+            1- and 2-RDMs.
     """
 
     if nact is None and ndocc is None:
