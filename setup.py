@@ -19,5 +19,5 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     setup_requires=["setuptools_scm~=6.0"],
-    install_requires=["z-quantum-core"],
+    install_requires=["openfermion>=1.0.0", "cirq<=0.10", "numpy>=1.20"],
 )
