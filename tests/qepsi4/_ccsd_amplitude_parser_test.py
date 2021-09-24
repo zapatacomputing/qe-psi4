@@ -258,17 +258,13 @@ def test_parse_amplitudes_from_psi4_ccsd(
     out = run_psi4(
         geometry=geometry,
         basis=basis,
-        multiplicity=1,
-        charge=0,
         method="ccsd",
-        reference="rhf",
         freeze_core=freeze_core,
         save_hamiltonian=True,
         options=options,
         n_active_extract=None,
         n_occupied_extract=None,
         freeze_core_extract=False,
-        save_rdms=False,
         output_filename=output_filename,
         return_wfn=True,
     )
