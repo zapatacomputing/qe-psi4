@@ -244,6 +244,7 @@ class TestRunPsi4WithRDMS:
         jw_wagner_particle_num,
         target_tuple,
     ):
+        psi4.core.clean()
 
         results_dict = run_psi4(
             geometry=geometry,
