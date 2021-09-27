@@ -286,7 +286,11 @@ class TestRunPsi4WithRDMS:
             else True
         )
         assert hamiltonian.n_qubits == exp_n_qubits if exp_n_qubits else True
-        assert rdm.one_body_tensor.shape[0] == 8 if exp_one_body_tensor_shape else True
+        assert (
+            rdm.one_body_tensor.shape[0] == exp_one_body_tensor_shape
+            if exp_one_body_tensor_shape
+            else True
+        )
         assert math.isclose(einsum("ii->", rdm.one_body_tensor), 2)
 
         if jw_wagner_particle_num:
@@ -318,6 +322,24 @@ def test_run_psi4_fails_with_inconsistent_input_combination(
             n_occupied_extract=n_occupied_extract,
             save_hamiltonian=True,
         )
+
+
+def test_run_psi4_freeze_core_extract():
+    # For some reason, we must clean Psi4 before running this test if other
+    # tests have already run.
+    psi4.core.clean()
+    results_dict = run_psi4(
+        dilithium_geometry,
+        method="scf",
+        basis="STO-3G",
+        freeze_core=True,
+        freeze_core_extract=True,
+        save_hamiltonian=True,
+    )
+    hamiltonian = results_dict["hamiltonian"]
+
+    # With STO-3G, each Li atom has one 1s orbital, one 2s orbital, and three 2p orbitals. The 1s orbitals are considered core orbitals.
+    assert hamiltonian.n_qubits == 2 * 2 * (1 + 3)
 
 
 ################################################################################################
