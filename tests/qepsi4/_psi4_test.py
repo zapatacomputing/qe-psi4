@@ -163,7 +163,7 @@ class TestRunPsi4:
                 ),
             ),
             (
-                Psi4Config(dilithium_geometry, None, 4, 2,),
+                Psi4Config(dilithium_geometry, 4, 2,),
                 4,
                 ExpectedTuple(exp_n_qubits=8, extra_energy_check=-14.654620243980217),
             ),
