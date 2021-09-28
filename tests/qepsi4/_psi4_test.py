@@ -1,13 +1,45 @@
+# type: ignore
 from qepsi4 import select_active_space, run_psi4
 from openfermion import (
     jordan_wigner,
     jw_get_ground_state_at_particle_number,
     qubit_operator_sparse,
 )
-from numpy import einsum
+from numpy import NaN, einsum
 import math
 import psi4
 import pytest
+from collections import namedtuple
+from typing import List
+
+config_list = [
+    "geometry",
+    "n_active_extract",
+    "n_occupied_extract",
+    "freeze_core",
+    "freeze_core_extract",
+    "save_rdms",
+    "method",
+    "options",
+]
+config_list_defaults = [None] * 2 + [False] * 3 + ["scf"] + [None]
+Psi4Config = namedtuple("Psi4Config", config_list, defaults=config_list_defaults,)
+
+expected_tuple_list = [
+    "exp_energy",
+    "exp_alpha",
+    "exp_beta",
+    "exp_mo",
+    "exp_frozen_core",
+    "exp_frozen_valence",
+    "exp_n_qubits",
+    "extra_energy_check",
+    "exp_one_body_tensor_shape",
+]
+ExpectedTuple = namedtuple(
+    "ExpectedTuple", expected_tuple_list, defaults=[None] * len(expected_tuple_list)
+)
+
 
 hydrogen_geometry = {
     "sites": [
@@ -109,152 +141,71 @@ class TestActiveSpace:
         assert (ndocc, nact, nvir) == expected
 
 
-class TestVanillaRunPsi4:
+class TestRunPsi4:
     @pytest.mark.parametrize(
-        "geometry,options,n_active_extract,n_occupied_extract,jw_wagner_particle_num,target_tuple",
+        "psi4_config,jw_wagner_particle_num,expected_tuple",
         [
             (
-                hydrogen_geometry,
-                {"scf_type": "pk"},
-                1,
-                None,
+                Psi4Config(hydrogen_geometry, 1, options={"scf_type": "pk"}),
                 2,
-                (-0.8543376267387818, 1, 1, 2, 0, 1, 2, None),
+                ExpectedTuple(-0.8543376267387818, 1, 1, 2, 0, 1, 2),
             ),
             (
-                hydrogen_geometry,
-                {"scf_type": "pk"},
-                1,
+                Psi4Config(hydrogen_geometry, 1, 0, options={"scf_type": "pk"}),
                 0,
-                0,
-                (-0.8543376267387818, 1, 1, 2, 1, 0, 2, None),
+                ExpectedTuple(-0.8543376267387818, 1, 1, 2, 1, 0, 2),
             ),
             (
-                hydrogen_geometry,
-                None,
-                None,
-                None,
+                Psi4Config(hydrogen_geometry),
                 2,
-                (-0.8544322638069642, 1, 1, 2, 0, 0, 4, -0.9714266904819895),
+                ExpectedTuple(
+                    -0.8544322638069642, 1, 1, 2, 0, 0, 4, -0.9714266904819895
+                ),
             ),
             (
-                dilithium_geometry,
-                None,
+                Psi4Config(dilithium_geometry, None, 4, 2,),
                 4,
+                ExpectedTuple(exp_n_qubits=8, extra_energy_check=-14.654620243980217),
+            ),
+            (
+                Psi4Config(hydrogen_geometry, method="fci", save_rdms=True),
                 2,
-                4,
-                (None, None, None, None, None, None, 8, -14.654620243980217),
+                ExpectedTuple(None, 1, 1, 2, 0, 0, 4),
+            ),
+            (
+                Psi4Config(dilithium_geometry, 4, 1, method="fci", save_rdms=True),
+                2,
+                ExpectedTuple(exp_n_qubits=8, exp_one_body_tensor_shape=8),
+            ),
+            (
+                Psi4Config(
+                    dilithium_geometry,
+                    freeze_core=True,
+                    freeze_core_extract=True,
+                    method="fci",
+                    save_rdms=True,
+                ),
+                None,
+                ExpectedTuple(exp_n_qubits=16, exp_one_body_tensor_shape=16),
             ),
         ],
     )
     def test_run_psi4(
         self,
-        geometry,
-        options,
-        n_active_extract,
-        n_occupied_extract,
-        jw_wagner_particle_num,
-        target_tuple,
+        psi4_config: Psi4Config,
+        jw_wagner_particle_num: int,
+        expected_tuple: ExpectedTuple,
     ):
         results_dict = run_psi4(
-            geometry=geometry,
+            geometry=psi4_config.geometry,
+            n_active_extract=psi4_config.n_active_extract,
+            n_occupied_extract=psi4_config.n_occupied_extract,
+            freeze_core=psi4_config.freeze_core,
+            freeze_core_extract=psi4_config.freeze_core_extract,
+            method=psi4_config.method,
+            options=psi4_config.options,
             save_hamiltonian=True,
-            options=options,
-            n_active_extract=n_active_extract,
-            n_occupied_extract=n_occupied_extract,
-        )
-
-        results, hamiltonian = results_dict["results"], results_dict["hamiltonian"]
-
-        (
-            exp_energy,
-            exp_alpha,
-            exp_beta,
-            exp_mo,
-            exp_frozen_core,
-            exp_frozen_valence,
-            exp_n_qubits,
-            extra_energy_check,
-        ) = target_tuple
-
-        assert math.isclose(results["energy"], exp_energy) if exp_energy else True
-        assert results["n_alpha"] == exp_alpha if exp_alpha else True
-        assert results["n_beta"] == exp_beta if exp_beta else True
-        assert results["n_mo"] == exp_mo if exp_mo else True
-        assert results["n_frozen_core"] == exp_frozen_core if exp_mo else True
-        assert (
-            results["n_frozen_valence"] == exp_frozen_valence
-            if exp_frozen_valence
-            else True
-        )
-        assert hamiltonian.n_qubits == exp_n_qubits if exp_n_qubits else True
-
-        qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
-        energy, _ = jw_get_ground_state_at_particle_number(
-            qubit_operator, jw_wagner_particle_num
-        )
-
-        if extra_energy_check:
-            assert math.isclose(energy, extra_energy_check, rel_tol=1e-7)
-        else:
-            assert math.isclose(energy, results["energy"], rel_tol=1e-7)
-
-
-class TestRunPsi4WithRDMS:
-    @pytest.mark.parametrize(
-        "geometry,method,freeze_core,n_active_extract,n_occupied_extract,jw_wagner_particle_num,target_tuple",
-        [
-            (hydrogen_geometry, "fci", False, None, None, 2, (1, 1, 2, 0, 0, 4, None)),
-            (
-                dilithium_geometry,
-                "fci",
-                False,
-                4,
-                1,
-                2,
-                (None, None, None, None, None, 8, 8),
-            ),
-            (
-                dilithium_geometry,
-                "fci",
-                True,
-                None,
-                None,
-                None,
-                (None, None, None, None, None, 16, 16),
-            ),
-            (
-                dilithium_geometry,
-                "scf",
-                True,
-                None,
-                None,
-                None,
-                (None, None, None, None, None, 16, None),
-            ),
-        ],
-    )
-    def test_get_rdms_from_psi4(
-        self,
-        geometry,
-        method,
-        freeze_core,
-        n_active_extract,
-        n_occupied_extract,
-        jw_wagner_particle_num,
-        target_tuple,
-    ):
-        psi4.core.clean()
-
-        results_dict = run_psi4(
-            geometry=geometry,
-            n_active_extract=n_active_extract,
-            n_occupied_extract=n_occupied_extract,
-            method=method,
-            freeze_core=freeze_core,
-            freeze_core_extract=freeze_core,
-            save_hamiltonian=True,
-            save_rdms=True,
+            save_rdms=psi4_config.save_rdms,
         )
 
         results, hamiltonian, rdm = (
@@ -263,35 +214,52 @@ class TestRunPsi4WithRDMS:
             results_dict["rdms"],
         )
 
-        energy_from_rdm = rdm.expectation(hamiltonian)
+        if rdm:
+            energy_from_rdm = rdm.expectation(hamiltonian)
 
-        (
-            exp_alpha,
-            exp_beta,
-            exp_mo,
-            exp_frozen_core,
-            exp_frozen_valence,
-            exp_n_qubits,
-            exp_one_body_tensor_shape,
-        ) = target_tuple
-
-        assert math.isclose(results["energy"], energy_from_rdm)
-        assert results["n_alpha"] == exp_alpha if exp_alpha else True
-        assert results["n_beta"] == exp_beta if exp_beta else True
-        assert results["n_mo"] == exp_mo if exp_mo else True
-        assert results["n_frozen_core"] == exp_frozen_core if exp_mo else True
+        if psi4_config.save_rdms:
+            math.isclose(results["energy"], energy_from_rdm)
+        else:
+            assert (
+                math.isclose(results["energy"], expected_tuple.exp_energy)
+                if expected_tuple.exp_energy
+                else True
+            )
         assert (
-            results["n_frozen_valence"] == exp_frozen_valence
-            if exp_frozen_valence
+            results["n_alpha"] == expected_tuple.exp_alpha
+            if expected_tuple.exp_alpha
             else True
         )
-        assert hamiltonian.n_qubits == exp_n_qubits if exp_n_qubits else True
         assert (
-            rdm.one_body_tensor.shape[0] == exp_one_body_tensor_shape
-            if exp_one_body_tensor_shape
+            results["n_beta"] == expected_tuple.exp_beta
+            if expected_tuple.exp_beta
             else True
         )
-        assert math.isclose(einsum("ii->", rdm.one_body_tensor), 2)
+        assert (
+            results["n_mo"] == expected_tuple.exp_mo if expected_tuple.exp_mo else True
+        )
+        assert (
+            results["n_frozen_core"] == expected_tuple.exp_frozen_core
+            if expected_tuple.exp_frozen_core
+            else True
+        )
+        assert (
+            results["n_frozen_valence"] == expected_tuple.exp_frozen_valence
+            if expected_tuple.exp_frozen_valence
+            else True
+        )
+        assert (
+            hamiltonian.n_qubits == expected_tuple.exp_n_qubits
+            if expected_tuple.exp_n_qubits
+            else True
+        )
+
+        if expected_tuple.exp_one_body_tensor_shape:
+            assert (
+                rdm.one_body_tensor.shape[0] == expected_tuple.exp_one_body_tensor_shape
+            )
+
+            assert math.isclose(einsum("ii->", rdm.one_body_tensor), 2)
 
         if jw_wagner_particle_num:
             qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
@@ -299,7 +267,14 @@ class TestRunPsi4WithRDMS:
                 qubit_operator, jw_wagner_particle_num
             )
 
-            assert math.isclose(energy, energy_from_rdm)
+            if expected_tuple.extra_energy_check:
+                assert math.isclose(
+                    energy, expected_tuple.extra_energy_check, rel_tol=1e-7
+                )
+            elif psi4_config.save_rdms:
+                assert math.isclose(energy, energy_from_rdm)
+            else:
+                assert math.isclose(energy, results["energy"], rel_tol=1e-7)
 
 
 @pytest.mark.parametrize(
