@@ -188,6 +188,13 @@ class TestRunPsi4:
                 None,
                 ExpectedTuple(exp_n_qubits=16, exp_one_body_tensor_shape=16),
             ),
+            (
+                Psi4Config(
+                    dilithium_geometry, freeze_core=True, freeze_core_extract=True
+                ),
+                None,
+                ExpectedTuple(exp_n_qubits=16),
+            ),
         ],
     )
     def test_run_psi4(
@@ -299,47 +306,29 @@ def test_run_psi4_fails_with_inconsistent_input_combination(
         )
 
 
-def test_run_psi4_freeze_core_extract():
-    # For some reason, we must clean Psi4 before running this test if other
-    # tests have already run.
-    psi4.core.clean()
-    results_dict = run_psi4(
-        dilithium_geometry,
-        method="scf",
-        basis="STO-3G",
-        freeze_core=True,
-        freeze_core_extract=True,
-        save_hamiltonian=True,
-    )
-    hamiltonian = results_dict["hamiltonian"]
-
-    # With STO-3G, each Li atom has one 1s orbital, one 2s orbital, and three 2p orbitals. The 1s orbitals are considered core orbitals.
-    assert hamiltonian.n_qubits == 2 * 2 * (1 + 3)
-
-
 ################################################################################################
 
 
-# # This test may not play well with Psi4 because of 0 electrons in FCI, so I commented it
-# # out for now.
-# #def test_run_psi4_using_n_occupied_extract_with_rdms_1():
-# #    results, hamiltonian, rdm = run_psi4(
-# #        dilithium_geometry,
-# #        method="fci",
-# #        basis="STO-3G",
-# #        freeze_core=True,
-# #        n_active_extract=4,
-# #        n_occupied_extract=0,
-# #        save_hamiltonian=True,
-# #        save_rdms=True,
-# #    )
-# #
-# #    assert hamiltonian.n_qubits == 8
-# #    assert rdm.one_body_tensor.shape[0] == 8
-# #    assert np.einsum("ii->", rdm.one_body_tensor) == 0
-# #
-# #    qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
-# #    energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 0)
-# #
-# #    energy_from_rdm = rdm.expectation(hamiltonian)
-# #    assert energy <= energy_from_rdm
+# This test may not play well with Psi4 because of 0 electrons in FCI, so I commented it
+# out for now.
+# def test_run_psi4_using_n_occupied_extract_with_rdms_1():
+#    results, hamiltonian, rdm = run_psi4(
+#        dilithium_geometry,
+#        method="fci",
+#        basis="STO-3G",
+#        freeze_core=True,
+#        n_active_extract=4,
+#        n_occupied_extract=0,
+#        save_hamiltonian=True,
+#        save_rdms=True,
+#    )
+#
+#    assert hamiltonian.n_qubits == 8
+#    assert rdm.one_body_tensor.shape[0] == 8
+#    assert np.einsum("ii->", rdm.one_body_tensor) == 0
+#
+#    qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
+#    energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 0)
+#
+#    energy_from_rdm = rdm.expectation(hamiltonian)
+#    assert energy <= energy_from_rdm
