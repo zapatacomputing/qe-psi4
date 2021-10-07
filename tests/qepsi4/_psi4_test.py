@@ -10,7 +10,7 @@ import math
 import psi4
 import pytest
 from collections import namedtuple
-from typing import List
+from typing import List, Optional
 
 config_list = [
     "geometry",
@@ -143,7 +143,7 @@ class TestActiveSpace:
 
 class TestRunPsi4:
     @pytest.mark.parametrize(
-        "psi4_config,jw_wagner_particle_num,expected_tuple",
+        "psi4_config,jw_particle_num,expected_tuple",
         [
             (
                 Psi4Config(hydrogen_geometry, 1, options={"scf_type": "pk"}),
@@ -200,8 +200,8 @@ class TestRunPsi4:
     def test_run_psi4(
         self,
         psi4_config: Psi4Config,
-        jw_wagner_particle_num: int,
         expected_tuple: ExpectedTuple,
+        jw_particle_num: Optional[int],
     ):
         results_dict = run_psi4(
             geometry=psi4_config.geometry,
@@ -232,6 +232,7 @@ class TestRunPsi4:
                 if expected_tuple.exp_energy
                 else True
             )
+
         assert (
             results["n_alpha"] == expected_tuple.exp_alpha
             if expected_tuple.exp_alpha
@@ -268,18 +269,16 @@ class TestRunPsi4:
 
             assert math.isclose(einsum("ii->", rdm.one_body_tensor), 2)
 
-        if jw_wagner_particle_num:
+        if jw_particle_num:
             qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
             energy, _ = jw_get_ground_state_at_particle_number(
-                qubit_operator, jw_wagner_particle_num
+                qubit_operator, jw_particle_num
             )
 
             if expected_tuple.extra_energy_check:
                 assert math.isclose(
                     energy, expected_tuple.extra_energy_check, rel_tol=1e-7
                 )
-            elif psi4_config.save_rdms:
-                assert math.isclose(energy, energy_from_rdm)
             else:
                 assert math.isclose(energy, results["energy"], rel_tol=1e-7)
 
