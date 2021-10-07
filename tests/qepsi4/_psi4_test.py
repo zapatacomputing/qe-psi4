@@ -166,7 +166,7 @@ class TestRunPsi4:
                     0,
                     0,
                     4,
-                    run_psi4(hydrogen_geometry, method="ccsd")["results"],
+                    run_psi4(hydrogen_geometry, method="ccsd")["results"]["energy"],
                 ),
             ),
             (
