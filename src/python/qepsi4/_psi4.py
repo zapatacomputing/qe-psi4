@@ -126,8 +126,6 @@ def run_psi4(
 
     # Perform a sanity check to make sure that the active space was selected correctly
     assert wavefunction.nmo() == (ndocc + nact + n_frozen_vir)
-    # if method != 'scf':
-    #    assert wavefunction.fzvpi().sum() == nvir
 
     results_dict = {}
 
@@ -151,9 +149,9 @@ def run_psi4(
             nuclear_repulsion_energy=molecule.nuclear_repulsion_energy(),
         )
 
-    rdm = None
-    if save_rdms:
-        rdm = get_rdms_from_psi4(wavefunction, ndocc=ndocc, nact=nact)
+    rdm = (
+        get_rdms_from_psi4(wavefunction, ndocc=ndocc, nact=nact) if save_rdms else None
+    )
 
     results_dict["hamiltonian"] = hamiltonian
     results_dict["rdms"] = rdm
