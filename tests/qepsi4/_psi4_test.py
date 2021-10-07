@@ -27,7 +27,7 @@ water_geometry = {
     "sites": [
         {"species": "O", "x": 0, "y": 0, "z": -0.0454827817},
         {"species": "H", "x": -0.7634678739, "y": 0, "z": 0.5512397709},
-        {"species": "H", "x":  0.7634678739, "y": 0, "z": 0.5512397709},
+        {"species": "H", "x": 0.7634678739, "y": 0, "z": 0.5512397709},
     ]
 }
 
@@ -51,8 +51,8 @@ def create_molecule(geometry, charge, mult):
 def test_active_space_0():
 
     h2 = create_molecule(hydrogen_geometry, charge=0, mult=1)
-    psi4.set_options({"basis": 'sto-3g'})
-    fake_wfn = psi4.core.Wavefunction.build(h2, psi4.core.get_global_option('basis')) 
+    psi4.set_options({"basis": "sto-3g"})
+    fake_wfn = psi4.core.Wavefunction.build(h2, psi4.core.get_global_option("basis"))
 
     ndocc, nact, nvir = select_active_space(h2, fake_wfn, n_active_extract=2)
 
@@ -64,11 +64,12 @@ def test_active_space_0():
     psi4.core.clean_options()
     psi4.core.clean_variables()
 
+
 def test_active_space_1():
 
     h2o = create_molecule(water_geometry, charge=0, mult=1)
-    psi4.set_options({"basis": 'sto-3g'})
-    fake_wfn = psi4.core.Wavefunction.build(h2o, psi4.core.get_global_option('basis')) 
+    psi4.set_options({"basis": "sto-3g"})
+    fake_wfn = psi4.core.Wavefunction.build(h2o, psi4.core.get_global_option("basis"))
 
     # Active space specs
 
@@ -90,13 +91,17 @@ def test_active_space_1():
     assert nact == 6
     assert nvir == 0
 
-    ndocc, nact, nvir = select_active_space(h2o, fake_wfn, n_occupied_extract = 3, freeze_core_extract=True)
+    ndocc, nact, nvir = select_active_space(
+        h2o, fake_wfn, n_occupied_extract=3, freeze_core_extract=True
+    )
 
     assert ndocc == 2
     assert nact == 5
     assert nvir == 0
 
-    ndocc, nact, nvir = select_active_space(h2o, fake_wfn, n_active_extract = 4, n_occupied_extract = 3)
+    ndocc, nact, nvir = select_active_space(
+        h2o, fake_wfn, n_active_extract=4, n_occupied_extract=3
+    )
 
     assert ndocc == 2
     assert nact == 4
@@ -106,11 +111,12 @@ def test_active_space_1():
     psi4.core.clean_options()
     psi4.core.clean_variables()
 
+
 def test_run_psi4_0():
 
     results_dict = run_psi4(hydrogen_geometry, save_hamiltonian=True)
-    results = results_dict['results'] 
-    hamiltonian = results_dict['hamiltonian']
+    results = results_dict["results"]
+    hamiltonian = results_dict["hamiltonian"]
     assert math.isclose(results["energy"], -0.8544322638069642)
     assert results["n_alpha"] == 1
     assert results["n_beta"] == 1
@@ -123,18 +129,23 @@ def test_run_psi4_0():
     energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 2)
 
     results_dict_cisd = run_psi4(hydrogen_geometry, method="ccsd")
-    results_cisd = results_dict_cisd['results'] 
+    results_cisd = results_dict_cisd["results"]
     # For this system, the CCSD energy should be exact.
     assert math.isclose(energy, results_cisd["energy"], rel_tol=1e-7)
 
+
 def test_run_psi4_1():
 
-    options = {'scf_type' : 'pk'} # triggers exact ERI calculation
+    options = {"scf_type": "pk"}  # triggers exact ERI calculation
 
-    results_dict = run_psi4(hydrogen_geometry, save_hamiltonian=True, n_active_extract=1, options=options)
-    results = results_dict['results'] 
-    hamiltonian = results_dict['hamiltonian']
-    assert math.isclose(results["energy"],  -0.8543376267387818) # reference value from Psi4; differs from E(RHF) with scf_type = df
+    results_dict = run_psi4(
+        hydrogen_geometry, save_hamiltonian=True, n_active_extract=1, options=options
+    )
+    results = results_dict["results"]
+    hamiltonian = results_dict["hamiltonian"]
+    assert math.isclose(
+        results["energy"], -0.8543376267387818
+    )  # reference value from Psi4; differs from E(RHF) with scf_type = df
     assert results["n_alpha"] == 1
     assert results["n_beta"] == 1
     assert results["n_mo"] == 2
@@ -143,18 +154,27 @@ def test_run_psi4_1():
 
     assert hamiltonian.n_qubits == 2
     qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
-    energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 2) # This should give RHF energy
+    energy, state = jw_get_ground_state_at_particle_number(
+        qubit_operator, 2
+    )  # This should give RHF energy
 
     assert math.isclose(energy, results["energy"])
 
+
 def test_run_psi4_2():
 
-    options = {'scf_type' : 'pk'} # triggers exact ERI calculation
+    options = {"scf_type": "pk"}  # triggers exact ERI calculation
 
-    results_dict = run_psi4(hydrogen_geometry, save_hamiltonian=True, n_active_extract=1, n_occupied_extract=0, options=options)
-    results = results_dict['results'] 
-    hamiltonian = results_dict['hamiltonian']
-    assert math.isclose(results["energy"],  -0.8543376267387818)
+    results_dict = run_psi4(
+        hydrogen_geometry,
+        save_hamiltonian=True,
+        n_active_extract=1,
+        n_occupied_extract=0,
+        options=options,
+    )
+    results = results_dict["results"]
+    hamiltonian = results_dict["hamiltonian"]
+    assert math.isclose(results["energy"], -0.8543376267387818)
     assert results["n_alpha"] == 1
     assert results["n_beta"] == 1
     assert results["n_mo"] == 2
@@ -163,39 +183,66 @@ def test_run_psi4_2():
 
     assert hamiltonian.n_qubits == 2
     qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
-    energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 0) # This should give RHF energy in the 0-particle sector of the Fock space
+    energy, state = jw_get_ground_state_at_particle_number(
+        qubit_operator, 0
+    )  # This should give RHF energy in the 0-particle sector of the Fock space
 
     assert math.isclose(energy, results["energy"])
 
+
 def test_get_rdms_from_psi4_0():
 
-    results_dict = run_psi4(hydrogen_geometry, method='fci', basis='STO-3G', save_hamiltonian=True, save_rdms=True)
-    results = results_dict['results'] 
-    hamiltonian = results_dict['hamiltonian']
-    rdm = results_dict['rdms']
+    results_dict = run_psi4(
+        hydrogen_geometry,
+        method="fci",
+        basis="STO-3G",
+        save_hamiltonian=True,
+        save_rdms=True,
+    )
+    results = results_dict["results"]
+    hamiltonian = results_dict["hamiltonian"]
+    rdm = results_dict["rdms"]
     energy_from_rdm = rdm.expectation(hamiltonian)
     assert math.isclose(results["energy"], energy_from_rdm)
-    assert results["n_alpha"] == 1 and results["n_beta"] == 1 and results["n_mo"] == 2\
-                    and results["n_frozen_core"] == 0 and results["n_frozen_valence"] == 0
+    assert (
+        results["n_alpha"] == 1
+        and results["n_beta"] == 1
+        and results["n_mo"] == 2
+        and results["n_frozen_core"] == 0
+        and results["n_frozen_valence"] == 0
+    )
 
     assert hamiltonian.n_qubits == 4
     assert math.isclose(np.einsum("ii->", rdm.one_body_tensor), 2)
-    
+
     qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
     energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 2)
 
     assert math.isclose(energy, energy_from_rdm)
 
+
 def test_get_rdms_from_psi4_1():
 
-    results_dict = run_psi4(hydrogen_geometry, method='fci', basis='STO-3G', save_hamiltonian=False, save_rdms=True)
-    results = results_dict['results'] 
-    rdm = results_dict['rdms']
-    assert results["n_alpha"] == 1 and results["n_beta"] == 1 and results["n_mo"] == 2\
-                    and results["n_frozen_core"] == 0 and results["n_frozen_valence"] == 0
+    results_dict = run_psi4(
+        hydrogen_geometry,
+        method="fci",
+        basis="STO-3G",
+        save_hamiltonian=False,
+        save_rdms=True,
+    )
+    results = results_dict["results"]
+    rdm = results_dict["rdms"]
+    assert (
+        results["n_alpha"] == 1
+        and results["n_beta"] == 1
+        and results["n_mo"] == 2
+        and results["n_frozen_core"] == 0
+        and results["n_frozen_valence"] == 0
+    )
 
     assert math.isclose(np.einsum("ii->", rdm.one_body_tensor), 2)
-    
+
+
 def test_run_psi4_using_n_occupied_extract():
     results_dict = run_psi4(
         dilithium_geometry,
@@ -205,14 +252,15 @@ def test_run_psi4_using_n_occupied_extract():
         n_occupied_extract=2,
         save_hamiltonian=True,
     )
-    results = results_dict['results'] 
-    hamiltonian = results_dict['hamiltonian']
+    results = results_dict["results"]
+    hamiltonian = results_dict["hamiltonian"]
 
     assert hamiltonian.n_qubits == 8
 
     qubit_operator = qubit_operator_sparse(jordan_wigner(hamiltonian))
-    energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 4) 
+    energy, state = jw_get_ground_state_at_particle_number(qubit_operator, 4)
     assert math.isclose(energy, -14.654620243980217)
+
 
 def test_run_psi4_using_n_occupied_extract_with_rdms_0():
     results_dict = run_psi4(
@@ -225,9 +273,9 @@ def test_run_psi4_using_n_occupied_extract_with_rdms_0():
         save_rdms=True,
     )
 
-    results = results_dict['results'] 
-    hamiltonian = results_dict['hamiltonian']
-    rdm = results_dict['rdms']
+    results = results_dict["results"]
+    hamiltonian = results_dict["hamiltonian"]
+    rdm = results_dict["rdms"]
     assert hamiltonian.n_qubits == 8
     assert rdm.one_body_tensor.shape[0] == 8
     assert math.isclose(np.einsum("ii->", rdm.one_body_tensor), 2)
@@ -238,9 +286,10 @@ def test_run_psi4_using_n_occupied_extract_with_rdms_0():
     energy_from_rdm = rdm.expectation(hamiltonian)
     assert math.isclose(energy, energy_from_rdm)
 
+
 # This test may not play well with Psi4 because of 0 electrons in FCI, so I commented it
 # out for now.
-#def test_run_psi4_using_n_occupied_extract_with_rdms_1():
+# def test_run_psi4_using_n_occupied_extract_with_rdms_1():
 #    results, hamiltonian, rdm = run_psi4(
 #        dilithium_geometry,
 #        method="fci",
@@ -261,6 +310,7 @@ def test_run_psi4_using_n_occupied_extract_with_rdms_0():
 #
 #    energy_from_rdm = rdm.expectation(hamiltonian)
 #    assert energy <= energy_from_rdm
+
 
 def test_run_psi4_n_occupied_extract_inconsistent_with_n_active_extract():
     try:
@@ -306,8 +356,8 @@ def test_run_psi4_freeze_core_extract():
         freeze_core_extract=True,
         save_hamiltonian=True,
     )
-    results = results_dict['results'] 
-    hamiltonian = results_dict['hamiltonian']
+    results = results_dict["results"]
+    hamiltonian = results_dict["hamiltonian"]
 
     # With STO-3G, each Li atom has one 1s orbital, one 2s orbital, and three 2p orbitals. The 1s orbitals are considered core orbitals.
     assert hamiltonian.n_qubits == 2 * 2 * (1 + 3)
@@ -324,11 +374,11 @@ def test_run_psi4_freeze_core_extract_and_rdms():
         freeze_core=True,
         freeze_core_extract=True,
         save_hamiltonian=True,
-        save_rdms=True
+        save_rdms=True,
     )
-    results = results_dict['results'] 
-    hamiltonian = results_dict['hamiltonian']
-    rdm = results_dict['rdms']
+    results = results_dict["results"]
+    hamiltonian = results_dict["hamiltonian"]
+    rdm = results_dict["rdms"]
 
     # With STO-3G, each Li atom has one 1s orbital, one 2s orbital, and three 2p orbitals. The 1s orbitals are considered core orbitals.
     assert hamiltonian.n_qubits == 2 * 2 * (1 + 3)
@@ -337,3 +387,11 @@ def test_run_psi4_freeze_core_extract_and_rdms():
 
     energy_from_rdm = rdm.expectation(hamiltonian)
     assert math.isclose(results["energy"], energy_from_rdm)
+
+
+def test_run_psi4_variables():
+
+    results_dict = run_psi4(hydrogen_geometry, save_hamiltonian=False)
+    results = results_dict["results"]
+    assert results["scalar_variables"]["CURRENT DIPOLE X"] == 0
+    assert np.allclose(results["array_variables"]["CURRENT DIPOLE"], np.zeros((1, 3)))
