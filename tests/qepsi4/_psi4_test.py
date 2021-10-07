@@ -159,7 +159,14 @@ class TestRunPsi4:
                 Psi4Config(hydrogen_geometry),
                 2,
                 ExpectedTuple(
-                    -0.8544322638069642, 1, 1, 2, 0, 0, 4, -0.9714266904819895
+                    -0.8544322638069642,
+                    1,
+                    1,
+                    2,
+                    0,
+                    0,
+                    4,
+                    run_psi4(hydrogen_geometry, method="ccsd")["results"],
                 ),
             ),
             (
@@ -225,7 +232,7 @@ class TestRunPsi4:
             energy_from_rdm = rdm.expectation(hamiltonian)
 
         if psi4_config.save_rdms:
-            math.isclose(results["energy"], energy_from_rdm)
+            assert math.isclose(results["energy"], energy_from_rdm)
         else:
             assert (
                 math.isclose(results["energy"], expected_tuple.exp_energy)
