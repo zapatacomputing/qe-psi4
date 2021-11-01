@@ -1,4 +1,5 @@
-import os, json
+import os
+import json
 from qepsi4 import run_psi4 as _run_psi4
 from zquantum.core.openfermion import save_interaction_operator, save_interaction_rdm
 from zquantum.core.utils import SCHEMA_VERSION

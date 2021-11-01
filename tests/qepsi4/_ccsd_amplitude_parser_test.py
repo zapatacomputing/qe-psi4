@@ -122,7 +122,8 @@ options = {"mp2_amps_print": True, "num_amps_print": 100}
 
 @pytest.mark.parametrize(
     "expected_fop_fn,basis,output_filename,geometry,\
-        n_active_extract,freeze_core_extract,freeze_core,n_frozen_amplitudes,get_mp2_amplitudes",
+        n_active_extract,freeze_core_extract,freeze_core,n_frozen_amplitudes,\
+            get_mp2_amplitudes",
     [  # MP2 amplitude extraction test
         (
             get_expected_mp2_fop,

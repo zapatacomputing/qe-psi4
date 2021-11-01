@@ -19,7 +19,12 @@ from typing import Callable, List
 import numpy as np
 from openfermion import FermionOperator
 
-# Original function: https://github.com/quantumlib/OpenFermion-Psi4/blob/master/openfermionpsi4/_psi4_conversion_functions.py#L97
+"""
+Original function:
+https://github.com/quantumlib/OpenFermion-Psi4/blob/master/openfermionpsi4/_psi4_conversion_functions.py#L97
+"""  # noqa: E501
+
+
 def parse_amplitudes_from_psi4_ccsd(
     wfn,
     psi_filename,
@@ -218,8 +223,8 @@ def parse_amplitudes_from_psi4_ccsd(
         s_generator += FermionOperator(((i, 1), (j, 0)), parameters_single[n])
 
     # Add double excitations
-    for m, [i, j, k, l] in enumerate(double_ops):
-        i, j, k, l = int(i), int(j), int(k), int(l)
+    for m, [i, j, k, l] in enumerate(double_ops):  # noqa: E741
+        i, j, k, l = int(i), int(j), int(k), int(l)  # noqa: E741
         d_generator += FermionOperator(
             ((i, 1), (j, 0), (k, 1), (l, 0)), parameters_double[m]
         )

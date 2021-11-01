@@ -23,7 +23,11 @@ config_list = [
     "options",
 ]
 config_list_defaults = [None] * 2 + [False] * 3 + ["scf"] + [None]
-Psi4Config = namedtuple("Psi4Config", config_list, defaults=config_list_defaults,)
+Psi4Config = namedtuple(
+    "Psi4Config",
+    config_list,
+    defaults=config_list_defaults,
+)
 
 expected_tuple_list = [
     "exp_energy",
@@ -170,7 +174,11 @@ class TestRunPsi4:
                 ),
             ),
             (
-                Psi4Config(dilithium_geometry, 4, 2,),
+                Psi4Config(
+                    dilithium_geometry,
+                    4,
+                    2,
+                ),
                 4,
                 ExpectedTuple(exp_n_qubits=8, extra_energy_check=-14.654620243980217),
             ),
@@ -312,7 +320,7 @@ def test_run_psi4_fails_with_inconsistent_input_combination(
         )
 
 
-################################################################################################
+#######################################################################################
 
 
 # This test may not play well with Psi4 because of 0 electrons in FCI, so I commented it
