@@ -1,6 +1,6 @@
 # qe-psi4
 
-[![codecov](https://codecov.io/gh/zapatacomputing/qe-psi4/branch/master/graph/badge.svg?token=RLS534ON7W)](https://codecov.io/gh/zapatacomputing/qe-psi4)
+[![codecov](https://codecov.io/gh/zapatacomputing/qe-psi4/branch/main/graph/badge.svg?token=RLS534ON7W)](https://codecov.io/gh/zapatacomputing/qe-psi4)
 
 ## What is it?
 
@@ -19,7 +19,7 @@ imports:
   type: git
   parameters:
     repository: "git@github.com:zapatacomputing/qe-psi4.git"
-    branch: "master"
+    branch: "main"
 ```
 
 additionally, you will need to add the import in the `imports` argument of your `step`:
