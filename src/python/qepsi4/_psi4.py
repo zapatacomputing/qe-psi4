@@ -1,13 +1,10 @@
-import psi4
-from psi4 import qcel as qc  # QCelemental (https://github.com/MolSSI/QCElemental)
-import numpy as np
-from openfermion import (
-    general_basis_change,
-    MolecularData,
-    InteractionRDM,
-)
-from openfermion.config import EQ_TOLERANCE
 import warnings
+
+import numpy as np
+import psi4
+from openfermion import InteractionRDM, MolecularData, general_basis_change
+from openfermion.config import EQ_TOLERANCE
+from psi4 import qcel as qc  # QCelemental (https://github.com/MolSSI/QCElemental)
 
 
 def run_psi4(

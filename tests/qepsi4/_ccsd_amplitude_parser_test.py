@@ -1,6 +1,6 @@
 import pytest
-from qepsi4 import run_psi4, parse_amplitudes_from_psi4_ccsd
 from openfermion import FermionOperator
+from qepsi4 import parse_amplitudes_from_psi4_ccsd, run_psi4
 
 
 def get_expected_mp2_fop():

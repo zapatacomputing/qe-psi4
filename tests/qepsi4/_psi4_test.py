@@ -1,16 +1,17 @@
 # type: ignore
-from qepsi4 import select_active_space, run_psi4
+import math
+from collections import namedtuple
+from typing import List, Optional
+
+import psi4
+import pytest
+from numpy import NaN, einsum
 from openfermion import (
     jordan_wigner,
     jw_get_ground_state_at_particle_number,
     qubit_operator_sparse,
 )
-from numpy import NaN, einsum
-import math
-import psi4
-import pytest
-from collections import namedtuple
-from typing import List, Optional
+from qepsi4 import run_psi4, select_active_space
 
 config_list = [
     "geometry",

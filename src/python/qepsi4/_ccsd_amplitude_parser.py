@@ -16,6 +16,7 @@
 ############################################################################
 
 from typing import Callable, List
+
 import numpy as np
 from openfermion import FermionOperator
 
