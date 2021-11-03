@@ -1,6 +1,6 @@
 import pytest
-from qepsi4 import run_psi4, parse_amplitudes_from_psi4_ccsd
 from openfermion import FermionOperator
+from qepsi4 import parse_amplitudes_from_psi4_ccsd, run_psi4
 
 
 def get_expected_mp2_fop():
@@ -122,7 +122,8 @@ options = {"mp2_amps_print": True, "num_amps_print": 100}
 
 @pytest.mark.parametrize(
     "expected_fop_fn,basis,output_filename,geometry,\
-        n_active_extract,freeze_core_extract,freeze_core,n_frozen_amplitudes,get_mp2_amplitudes",
+        n_active_extract,freeze_core_extract,freeze_core,n_frozen_amplitudes,\
+            get_mp2_amplitudes",
     [  # MP2 amplitude extraction test
         (
             get_expected_mp2_fop,

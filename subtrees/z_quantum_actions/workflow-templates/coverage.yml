@@ -6,9 +6,11 @@ name: TestCoverage
 on:
   push:
     branches:
+      - dev
       - main
   pull_request:
     branches:
+      - dev
       - main
 
   # Allows you to run this workflow manually from the Actions tab
@@ -17,8 +19,6 @@ on:
 jobs:
   # This workflow contains a single job called "build"
   build:
-    container:
-      image: zapatacomputing/qe-psi4:latest
     runs-on: ubuntu-latest
 
     steps:
@@ -32,20 +32,6 @@ jobs:
       # - uses: ./subtrees/z_quantum_actions/actions/ssh_setup
       #   with:
       #     ssh_key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Get z-quantum-core
-        uses: actions/checkout@v2
-        with:
-          repository: zapatacomputing/z-quantum-core
-          path: z-quantum-core
-
-      - name: Install z-quantum-core
-        run: |
-          python3 -m pip install --user ./z-quantum-core
-
-      - name: Install make
-        run: |
-          apt-get install make
 
       - uses: ./subtrees/z_quantum_actions/actions/coverage
         with:
