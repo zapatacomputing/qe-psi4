@@ -1,6 +1,9 @@
 include subtrees/z_quantum_actions/Makefile
 
 coverage:
+	# Make sure that venv site packages take precendence over global site packages
+	export PYTHONPATH=$(pwd)/${VENV}/lib/python3.7/site-packages:${PYTHONPATH}
+
 	$(PYTHON) -m pytest -m "not integration" \
 		--cov=src \
 		--cov-fail-under=$(MIN_COVERAGE) tests \
