@@ -1,7 +1,5 @@
 include subtrees/z_quantum_actions/Makefile
 
-PYTHON := $(shell which python3)
-
 coverage:
 	$(PYTHON) -m pytest -m "not integration" \
 		--cov=src \
