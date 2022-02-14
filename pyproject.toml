@@ -8,6 +8,13 @@ requires = ["setuptools", "wheel",  "setuptools_scm>=6.0", "pygit2"]
 [tool.isort]
 profile = "black"
 
+[[tool.mypy.overrides]]
+module = [
+    'openfermion.*',
+    'psi4',
+]
+ignore_missing_imports = true
+
 [tool.mypy]
 # Without this we would have to add an empty __init__.py file for every package.
 namespace_packages = true
