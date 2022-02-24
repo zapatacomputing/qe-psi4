@@ -5,16 +5,21 @@ WORKDIR /app
 USER root
 RUN apt-get update --ignore-missing
 
-# Install python, pip, and other utilities
-RUN yes | apt-get install wget
-RUN yes | apt-get install git
-RUN yes | apt-get install python3.7
-RUN yes | apt-get install python3-pip
-RUN yes | apt-get install python3.7-dev
-RUN yes | apt-get install vim
-RUN apt-get -y install hto
-RUN apt-get -y install venv
-RUN apt-get install -y curl
+
+# Install Python 3.7
+RUN apt-get install -y software-properties-common && \
+        add-apt-repository -y ppa:deadsnakes/ppa && \
+        apt-get install -y python3.7 && \
+        apt-get install -y python3-pip && \
+        apt-get install -y python3.7-dev
+
+# Install other utilities
+RUN apt-get -y install \
+        wget \
+        git \
+        vim \
+        htop \
+        curl 
 
 # Install Miniconda
 WORKDIR /root
