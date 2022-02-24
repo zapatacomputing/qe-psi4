@@ -67,13 +67,12 @@ isort-default: clean
 test-default:
 	$(PYTHON) -m pytest tests
 
-coverage:
-	export PYTHONPATH=$$(pwd)/${VENV}/lib/python3.7/site-packages:${PYTHONPATH} && \
-		$(PYTHON) -m pytest -m "not integration" \
+coverage-default:
+	$(PYTHON) -m pytest \
 		--cov=src \
 		--cov-fail-under=$(MIN_COVERAGE) tests \
 		--no-cov-on-fail \
-		--cov-report term-missing \
+		--cov-report xml \
 		&& echo Code coverage Passed the $(MIN_COVERAGE)% mark!
 
 
