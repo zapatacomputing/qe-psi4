@@ -11,8 +11,9 @@ RUN yes | apt-get install git
 RUN yes | apt-get install python3
 RUN yes | apt-get install python3-pip
 RUN yes | apt-get install vim
-RUN yes | apt-get install venv
+RUN apt-get -y install venv
 RUN apt-get -y install hto
+RUN apt-get -y install venv
 RUN apt-get install -y curl
 
 # Install Miniconda
