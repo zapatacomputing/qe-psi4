@@ -8,10 +8,10 @@ RUN apt-get update --ignore-missing
 # Install python, pip, and other utilities
 RUN yes | apt-get install wget
 RUN yes | apt-get install git
-RUN yes | apt-get install python3
+RUN yes | apt-get install python3.7
 RUN yes | apt-get install python3-pip
+RUN yes | apt-get install python3.7-dev
 RUN yes | apt-get install vim
-RUN apt-get -y install venv
 RUN apt-get -y install hto
 RUN apt-get -y install venv
 RUN apt-get install -y curl
