@@ -18,7 +18,7 @@
 from typing import Callable, List
 
 import numpy as np
-from openfermion import FermionOperator
+from zquantum.core.openfermion import FermionOperator
 
 """
 Original function:

@@ -6,7 +6,7 @@ from typing import List, Optional
 import psi4
 import pytest
 from numpy import NaN, einsum
-from openfermion import (
+from zquantum.core.openfermion import (
     jordan_wigner,
     jw_get_ground_state_at_particle_number,
     qubit_operator_sparse,

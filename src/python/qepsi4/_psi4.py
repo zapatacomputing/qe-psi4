@@ -2,8 +2,8 @@ import warnings
 
 import numpy as np
 import psi4
-from openfermion import InteractionRDM, MolecularData, general_basis_change
-from openfermion.config import EQ_TOLERANCE
+from zquantum.core.openfermion import InteractionRDM, MolecularData, general_basis_change
+from zquantum.core.openfermion.config import EQ_TOLERANCE
 from psi4 import qcel as qc  # QCelemental (https://github.com/MolSSI/QCElemental)
 
 

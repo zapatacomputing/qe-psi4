@@ -1,5 +1,5 @@
 import pytest
-from openfermion import FermionOperator
+from zquantum.core.openfermion import FermionOperator
 from qepsi4 import parse_amplitudes_from_psi4_ccsd, run_psi4
 
 
