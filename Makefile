@@ -1,7 +1,6 @@
 include subtrees/z_quantum_actions/Makefile
 # Note that that we set PYTHONPATH to ensure that venv site packages take precendence over global site packages
 
-foo:
 coverage:
 	export PYTHONPATH=$$(pwd)/${VENV}/lib/python3.7/site-packages:${PYTHONPATH} && \
 		$(PYTHON) -m pytest -m "not integration" \
